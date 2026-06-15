@@ -14,7 +14,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AeroFleet Command",
+  title: "TouchTrack - Fleet Command",
   description: "Operational Digital Twin Dashboard for enterprise logistics managers.",
 };
 

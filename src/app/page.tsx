@@ -611,9 +611,16 @@ export default function Home() {
       {/* TopNavBar */}
       <header className="bg-white/60 backdrop-blur-xl border-b border-outline-variant/30 flex justify-between items-center w-full px-container-padding h-16 shrink-0 z-50">
         <div className="flex items-center gap-stack-lg">
-          <span className="text-xl font-bold text-primary tracking-tight font-outfit flex items-center gap-2">
-            AeroFleet Command
-          </span>
+          <div className="relative h-8 w-36 flex items-center">
+            <Image
+              src="/logo.png"
+              alt="TouchTrack Logo"
+              fill
+              sizes="144px"
+              priority
+              className="object-contain"
+            />
+          </div>
           
           {/* Global Status Chips */}
           <div className="hidden lg:flex items-center gap-2">
@@ -1314,7 +1321,7 @@ export default function Home() {
           </div>
           <span className="uppercase tracking-tighter hidden sm:inline">Sync: {syncDiffSeconds}s ago</span>
         </div>
-        <span className="uppercase tracking-widest text-[8.5px]">© 2026 AEROFLEET COMMAND CENTER</span>
+        <span className="uppercase tracking-widest text-[8.5px]">© 2026 TOUCHTRACK OPERATIONS CENTER</span>
       </footer>
       
     </div>
