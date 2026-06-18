@@ -112,7 +112,7 @@ const INITIAL_VEHICLES: Vehicle[] = [
   {
     id: "T 10225",
     name: "SCANIA",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAPCGewpYS3q5m85vQxofW0kIEOwXHxou78Dsvndvf0h2XYx1WDhiR_CKBA8wNftTIpEQsSZgLr4l-Wz4T5ExwBlKdQoHRhMo5XM2zRoZQcVRGy8l95DxN-6tk5y5rZ6r-NsZ5TN1BmmRjdDc3hd_So8DhA9SLTtsOsw807aQ4j2I0qtCZW_Fv9TH7RJz_128KWpCnW8bU7PkdYJV02aRtr3Bs9vKpC1-GJNsNnQjykOy113O0dMPb3v1zN6SzLxk_jYguMOnc2lZM",
+    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBD_NGxmvnLMhqqVOtGPLKkdlt3Y_MaR-mdNRweAdTjHjY2O3Y6vJAcUvi4lZkM6jXsBjxc-0LoT1cZEpPhGHnWrd8JOzy2bKYr9shQTLDMxLu7aWfTmjiXrzBPcfuwLd_sKfbgRr7ZVzd-WRaRHQyOAl0QVqo01Kpml3C_cMV_KCDRPGl0tb0svDk9YA86TPgIebPpB5k75xHPPi-DhzaB86UN1qy8m0bJVc6OwHHvjaG1-4-rYro0SYp8yAMgZRgfoa8O7dUTMqg",
     driverName: "Sarah Connor",
     driverRole: "Secondary Operator",
     driverImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuCjjN7Y7EJHl7wvDq2vvL-a1Ynrdpi8uWFRmO3IXw4F-j38XiA8w4pvO4VhjoeK4vaV2K8b_kTRCAYiiGRxZ0O4MEayso9qWd6yeCOHty8zXysBERvDUWPVBsUXFZl5OPHpYdIi16C64mqsggpPARouN7UoV1g5omEOsVS-28XfUCdwPqswbPvQsbNJcTiMIxgxhqkilYIzc6Hgd7l2vkbWL9BjaKzJ_qbyOaVhlcep3Th0yc6hrWo1ZiMrSmgYuhPhaGLoPDgq_hs",
