@@ -645,80 +645,43 @@ export default function Home() {
           </div>
           
           {/* Global Alert Counters */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-rose-50/60 border border-rose-100/50 px-2.5 py-1 rounded-full text-rose-600 hover:bg-rose-50 transition-all">
             {/* Seat Belt Alert */}
-            <div 
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 ${
-                alertStats.seatbelt > 0 
-                  ? "bg-rose-50 border border-rose-100 text-rose-600 font-bold animate-alert-glow shadow-sm" 
-                  : "bg-slate-50/40 border border-slate-100/30 text-slate-400 opacity-50"
-              }`} 
-              title="Seatbelt Alerts Count"
-            >
-              <span className={`material-symbols-outlined text-[16px] ${alertStats.seatbelt > 0 ? "animate-alert-shake" : ""}`}>
-                airline_seat_recline_normal
-              </span>
-              <span className="text-[11px] font-bold font-mono">{alertStats.seatbelt}</span>
+            <div className="flex items-center gap-1" title="Seatbelt Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">airline_seat_recline_normal</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.seatbelt}</span>
             </div>
-
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
+            
             {/* Overspeed Alert */}
-            <div 
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 ${
-                alertStats.speed > 0 
-                  ? "bg-rose-50 border border-rose-100 text-rose-600 font-bold animate-alert-glow shadow-sm" 
-                  : "bg-slate-50/40 border border-slate-100/30 text-slate-400 opacity-50"
-              }`} 
-              title="Overspeed Alerts Count"
-            >
-              <span className={`material-symbols-outlined text-[16px] ${alertStats.speed > 0 ? "animate-alert-shake" : ""}`}>
-                speed
-              </span>
-              <span className="text-[11px] font-bold font-mono">{alertStats.speed}</span>
+            <div className="flex items-center gap-1" title="Overspeed Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">speed</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.speed}</span>
             </div>
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
 
             {/* Excessive Idling Alert */}
-            <div 
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 ${
-                alertStats.idle > 0 
-                  ? "bg-rose-50 border border-rose-100 text-rose-600 font-bold animate-alert-glow shadow-sm" 
-                  : "bg-slate-50/40 border border-slate-100/30 text-slate-400 opacity-50"
-              }`} 
-              title="Excessive Idling Alerts Count"
-            >
-              <span className={`material-symbols-outlined text-[16px] ${alertStats.idle > 0 ? "animate-alert-shake" : ""}`}>
-                hourglass_empty
-              </span>
-              <span className="text-[11px] font-bold font-mono">{alertStats.idle}</span>
+            <div className="flex items-center gap-1" title="Excessive Idling Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">hourglass_empty</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.idle}</span>
             </div>
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
 
             {/* Door Open Alert */}
-            <div 
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 ${
-                alertStats.doorOpen > 0 
-                  ? "bg-rose-50 border border-rose-100 text-rose-600 font-bold animate-alert-glow shadow-sm" 
-                  : "bg-slate-50/40 border border-slate-100/30 text-slate-400 opacity-50"
-              }`} 
-              title="Door Open Alerts Count"
-            >
-              <span className={`material-symbols-outlined text-[16px] ${alertStats.doorOpen > 0 ? "animate-alert-shake" : ""}`}>
-                sensor_door
-              </span>
-              <span className="text-[11px] font-bold font-mono">{alertStats.doorOpen}</span>
+            <div className="flex items-center gap-1" title="Door Open Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">sensor_door</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.doorOpen}</span>
             </div>
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
 
             {/* Temperature Variation Alert */}
-            <div 
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 ${
-                alertStats.tempVariation > 0 
-                  ? "bg-rose-50 border border-rose-100 text-rose-600 font-bold animate-alert-glow shadow-sm" 
-                  : "bg-slate-50/40 border border-slate-100/30 text-slate-400 opacity-50"
-              }`} 
-              title="Temperature Alerts Count"
-            >
-              <span className={`material-symbols-outlined text-[16px] ${alertStats.tempVariation > 0 ? "animate-alert-shake" : ""}`}>
-                thermostat
-              </span>
-              <span className="text-[11px] font-bold font-mono">{alertStats.tempVariation}</span>
+            <div className="flex items-center gap-1" title="Temperature Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">thermostat</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.tempVariation}</span>
             </div>
           </div>
         </div>
