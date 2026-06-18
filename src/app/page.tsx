@@ -24,6 +24,9 @@ interface Vehicle {
   alerts: {
     idle: number;
     speed: number;
+    seatbelt: number;
+    doorOpen: number;
+    tempVariation: number;
   };
   tripMetrics: {
     dist: string;
@@ -60,7 +63,7 @@ const INITIAL_VEHICLES: Vehicle[] = [
     status: "ACTIVE",
     speed: 68,
     fuel: 65,
-    alerts: { idle: 0, speed: 0 },
+    alerts: { idle: 0, speed: 0, seatbelt: 0, doorOpen: 0, tempVariation: 0 },
     tripMetrics: {
       dist: "210.5 mi",
       duration: "3h 45m",
@@ -89,7 +92,7 @@ const INITIAL_VEHICLES: Vehicle[] = [
     status: "IDLE",
     speed: 0,
     fuel: 48,
-    alerts: { idle: 3, speed: 1 },
+    alerts: { idle: 3, speed: 1, seatbelt: 2, doorOpen: 1, tempVariation: 4 },
     tripMetrics: {
       dist: "412.5 mi",
       duration: "6h 12m",
@@ -118,7 +121,7 @@ const INITIAL_VEHICLES: Vehicle[] = [
     status: "ACTIVE",
     speed: 92,
     fuel: 82,
-    alerts: { idle: 1, speed: 2 },
+    alerts: { idle: 1, speed: 2, seatbelt: 0, doorOpen: 0, tempVariation: 1 },
     tripMetrics: {
       dist: "520.1 mi",
       duration: "8h 15m",
@@ -147,7 +150,7 @@ const INITIAL_VEHICLES: Vehicle[] = [
     status: "ACTIVE",
     speed: 45,
     fuel: 75,
-    alerts: { idle: 0, speed: 0 },
+    alerts: { idle: 0, speed: 0, seatbelt: 1, doorOpen: 0, tempVariation: 0 },
     tripMetrics: {
       dist: "95.4 mi",
       duration: "2h 10m",
@@ -283,6 +286,25 @@ export default function Home() {
   const selectedVehicle = useMemo(() => {
     return vehicles.find((v) => v.id === selectedVehicleId) || null;
   }, [vehicles, selectedVehicleId]);
+
+  // Find fleet-wide alert statistics
+  const alertStats = useMemo(() => {
+    let seatbelt = 0;
+    let speed = 0;
+    let idle = 0;
+    let doorOpen = 0;
+    let tempVariation = 0;
+
+    vehicles.forEach((v) => {
+      seatbelt += v.alerts.seatbelt || 0;
+      speed += v.alerts.speed || 0;
+      idle += v.alerts.idle || 0;
+      doorOpen += v.alerts.doorOpen || 0;
+      tempVariation += v.alerts.tempVariation || 0;
+    });
+
+    return { seatbelt, speed, idle, doorOpen, tempVariation };
+  }, [vehicles]);
 
   // Simulation loop for live telemetry updates
   useEffect(() => {
@@ -631,6 +653,47 @@ export default function Home() {
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 border border-slate-100/50">
               <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
               <span className="text-[11px] font-bold text-slate-500 tracking-tight font-outfit">{stats.idle} IDLE</span>
+            </div>
+          </div>
+
+          {/* Global Alert Counters */}
+          <div className="flex items-center gap-2 bg-rose-50/60 border border-rose-100/50 px-2.5 py-1 rounded-full text-rose-600 hover:bg-rose-50 transition-all">
+            {/* Seat Belt Alert */}
+            <div className="flex items-center gap-1" title="Seatbelt Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">airline_seat_recline_normal</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.seatbelt}</span>
+            </div>
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
+            
+            {/* Overspeed Alert */}
+            <div className="flex items-center gap-1" title="Overspeed Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">speed</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.speed}</span>
+            </div>
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
+
+            {/* Excessive Idling Alert */}
+            <div className="flex items-center gap-1" title="Excessive Idling Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">hourglass_empty</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.idle}</span>
+            </div>
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
+
+            {/* Door Open Alert */}
+            <div className="flex items-center gap-1" title="Door Open Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">sensor_door</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.doorOpen}</span>
+            </div>
+            
+            <div className="h-3 w-[1px] bg-rose-200/50"></div>
+
+            {/* Temperature Variation Alert */}
+            <div className="flex items-center gap-1" title="Temperature Alerts Count">
+              <span className="material-symbols-outlined text-[16px] font-bold">thermostat</span>
+              <span className="text-[10px] font-bold font-mono">{alertStats.tempVariation}</span>
             </div>
           </div>
         </div>
