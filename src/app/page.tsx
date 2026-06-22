@@ -509,7 +509,7 @@ export default function Home() {
             </div>
             
             <!-- Map Pin Circle -->
-            <div class="w-9 h-9 rounded-full bg-white border-2 shadow-xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
+            <div class="w-9 h-9 rounded-full bg-white border-[3.5px] shadow-xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
               isSelected
                 ? "border-[#4f46e5] scale-110 ring-4 ring-[#4f46e5]/25"
                 : v.status === "ACTIVE"
@@ -934,12 +934,12 @@ export default function Home() {
                         <div
                           key={`shrink-rail-${v.id}`}
                           onClick={() => setSelectedVehicleId(v.id)}
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 relative ${
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 relative border-[2.5px] ${
                             v.status === "ACTIVE"
-                              ? "bg-emerald-50 border border-emerald-100"
+                              ? "border-emerald-500 bg-emerald-50/30"
                               : v.status === "IDLE"
-                              ? "bg-amber-50 border border-amber-100"
-                              : "bg-slate-50 border border-slate-100"
+                              ? "border-amber-500 bg-amber-50/30"
+                              : "border-red-500 bg-red-50/30"
                           }`}
                           title={`${v.id} | ${v.name}`}
                         >
@@ -1100,7 +1100,7 @@ export default function Home() {
                             <div className="p-3 hover:bg-slate-50/80 transition-colors">
                               <div className="flex items-start gap-3">
                                 {/* Vehicle Image */}
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden border shrink-0 mt-0.5 relative ${vehicle.status === "ACTIVE" ? "bg-emerald-50 border-emerald-100" : vehicle.status === "IDLE" ? "bg-amber-50 border-amber-100" : "bg-slate-50 border-slate-100"}`}>
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden shrink-0 mt-0.5 relative border-[2.5px] ${vehicle.status === "ACTIVE" ? "border-emerald-500 bg-emerald-50/30" : vehicle.status === "IDLE" ? "border-amber-500 bg-amber-50/30" : "border-red-500 bg-red-50/30"}`}>
                                   <Image
                                     alt={vehicle.name}
                                     fill
@@ -1182,12 +1182,12 @@ export default function Home() {
                             isSelected
                               ? "ring-2 ring-primary ring-offset-2 opacity-100 scale-105"
                               : "opacity-50 hover:opacity-85"
-                          } ${
+                          } border-[2.5px] ${
                             v.status === "ACTIVE"
-                              ? "bg-emerald-50 border border-emerald-100"
+                              ? "border-emerald-500 bg-emerald-50/30"
                               : v.status === "IDLE"
-                              ? "bg-amber-50 border border-amber-100"
-                              : "bg-slate-50 border border-slate-100"
+                              ? "border-amber-500 bg-amber-50/30"
+                              : "border-red-500 bg-red-50/30"
                           }`}
                           title={`${v.id} | ${v.name}`}
                         >
@@ -1233,7 +1233,7 @@ export default function Home() {
                       
                       {/* Vehicle Splash Card */}
                       <div>
-                        <div className="mb-4 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm relative h-32 w-full">
+                        <div className={`mb-4 rounded-2xl overflow-hidden shadow-sm relative h-32 w-full border-[3px] transition-all duration-300 ${selectedVehicle.status === "ACTIVE" ? "border-emerald-500 bg-emerald-50/10" : selectedVehicle.status === "IDLE" ? "border-amber-500 bg-amber-50/10" : "border-red-500 bg-red-50/10"}`}>
                           <Image
                             alt={selectedVehicle.name}
                             fill
