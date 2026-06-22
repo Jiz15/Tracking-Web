@@ -288,3 +288,14 @@ body {
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* Remove text input background and keep stroke only in dark mode */
+.dark input[type="text"] {
+  background-color: transparent !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.dark input[type="text"]::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
