@@ -258,6 +258,22 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "IDLE" | "STOP">("ALL");
   const [isListShrunk, setIsListShrunk] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+    setTimeout(() => {
+      if (savedTheme) {
+        setTheme(savedTheme);
+      } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        setTheme("dark");
+      }
+    }, 0);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   // Customize floating panel checkboxes
   const [displayFields, setDisplayFields] = useState({
@@ -374,8 +390,13 @@ export default function Home() {
       }).setView([25.12, 55.2], 11);
 
       // Custom base layer layer (default to vector map)
+      const savedTheme = localStorage.getItem("theme");
+      const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const initialDark = savedTheme === "dark" || (!savedTheme && isSystemDark);
       const baseLayer = L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        initialDark
+          ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
         { maxZoom: 18 }
       ).addTo(mapInstance);
 
@@ -399,7 +420,7 @@ export default function Home() {
     };
   }, []);
 
-  // Update map layer on theme toggle (vector vs satellite)
+  // Update map layer on theme toggle (vector vs satellite vs dark)
   useEffect(() => {
     if (map) {
       const customMap = map as CustomMap;
@@ -409,16 +430,17 @@ export default function Home() {
 
       import("leaflet").then((LModule) => {
         const L = LModule.default;
-        const newLayer = L.tileLayer(
-          satelliteView
-            ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-          { maxZoom: 18 }
-        ).addTo(map);
+        let url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+        if (satelliteView) {
+          url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+        } else if (theme === "dark") {
+          url = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+        }
+        const newLayer = L.tileLayer(url, { maxZoom: 18 }).addTo(map);
         customMap._tileLayer = newLayer;
       });
     }
-  }, [map, satelliteView]);
+  }, [map, satelliteView, theme]);
 
   // Update markers coordinates, active outline rings, and route path polylines
   useEffect(() => {
@@ -768,7 +790,7 @@ export default function Home() {
   }, [vehicles]);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-surface text-on-surface select-none font-outfit">
+    <div className={`flex flex-col h-screen overflow-hidden bg-surface dark:bg-slate-950 text-on-surface dark:text-slate-100 select-none font-outfit ${theme === "dark" ? "dark" : ""}`}>
       
       {/* TopNavBar */}
       <header className="bg-white/60 backdrop-blur-xl border-b border-outline-variant/30 flex justify-between items-center w-full px-container-padding h-16 shrink-0 z-50">
@@ -840,16 +862,25 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-1">
-            <button className="p-2 text-slate-500 hover:bg-slate-100/50 transition-colors rounded-full relative">
-              <span className="material-symbols-outlined text-[22px]">notifications</span>
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border border-white"></span>
+            <button
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors rounded-full"
+              title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            >
+              <span className="material-symbols-outlined text-[22px]">
+                {theme === "light" ? "dark_mode" : "light_mode"}
+              </span>
             </button>
-            <button className="p-2 text-slate-500 hover:bg-slate-100/50 transition-colors rounded-full">
+            <button className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors rounded-full relative">
+              <span className="material-symbols-outlined text-[22px]">notifications</span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border border-white dark:border-slate-900"></span>
+            </button>
+            <button className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors rounded-full">
               <span className="material-symbols-outlined text-[22px]">settings</span>
             </button>
           </div>
 
-          <div className="h-6 w-[1px] bg-slate-200 mx-2"></div>
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-2"></div>
           
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">

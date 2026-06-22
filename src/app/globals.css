@@ -154,3 +154,135 @@ body {
   color: #4f46e5 !important;
   background: transparent !important;
 }
+
+/* Dark Mode overrides */
+.dark body {
+  background-color: #020617 !important; /* Slate 950 */
+  color: #f1f5f9 !important;
+}
+
+.dark header {
+  background-color: rgba(15, 23, 42, 0.75) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark aside {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  border-right-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Text color overrides */
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark h3,
+.dark h2,
+.dark .text-slate-700 {
+  color: #f8fafc !important; /* Slate 50 */
+}
+
+.dark .text-slate-500,
+.dark .text-slate-600 {
+  color: #cbd5e1 !important; /* Slate 300 */
+}
+
+.dark .text-slate-400 {
+  color: #94a3b8 !important; /* Slate 400 */
+}
+
+/* Background overrides */
+.dark .bg-white {
+  background-color: #0f172a !important; /* Slate 900 */
+}
+
+.dark .bg-slate-50 {
+  background-color: #0f172a !important; /* Slate 900 */
+}
+
+.dark .bg-white\/50 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+.dark .bg-slate-900 {
+  background-color: #334155 !important; /* Slate 700 */
+}
+
+/* Borders */
+.dark .border-slate-100 {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .border-white\/30 {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .border-white\/80 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Hovers */
+.dark .hover\:bg-slate-50\/80:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark .hover\:bg-slate-50:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark .hover\:bg-slate-100:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .hover\:bg-white\/50:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Map Vignette in dark mode */
+.dark .map-vignette {
+  background: radial-gradient(circle at center, transparent 0%, rgba(2, 6, 23, 0.6) 100%) !important;
+}
+
+/* Popover overrides in dark mode */
+.dark .custom-leaflet-popup .leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .custom-leaflet-popup .leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.85) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .custom-leaflet-popup .leaflet-popup-close-button {
+  color: #94a3b8 !important;
+}
+
+.dark .custom-leaflet-popup .leaflet-popup-close-button:hover {
+  color: #4f46e5 !important;
+}
+
+.dark .custom-leaflet-popup .border-slate-100 {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .custom-leaflet-popup .hover\:bg-slate-50:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Custom scrollbars in dark mode */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
