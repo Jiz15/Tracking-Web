@@ -800,7 +800,7 @@ export default function Home() {
     <div className={`flex flex-col h-screen overflow-hidden bg-surface dark:bg-slate-950 text-on-surface dark:text-slate-100 select-none font-outfit ${theme === "dark" ? "dark" : ""}`}>
       
       {/* TopNavBar */}
-      <header className="bg-white/60 backdrop-blur-xl border-b border-outline-variant/30 flex justify-between items-center w-full px-container-padding h-16 shrink-0 z-50">
+      <header className="bg-white border-b border-outline-variant/30 flex justify-between items-center w-full px-container-padding h-16 shrink-0 z-50">
         <div className="flex items-center gap-stack-lg">
           <div className="relative h-8 w-36 flex items-center">
             <Image
@@ -911,7 +911,7 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden relative">
         
         {/* SideNavBar (Minimal Rail) */}
-        <aside className="bg-white/40 h-full w-20 flex-shrink-0 border-r border-slate-100/50 flex flex-col items-center py-6 gap-6 z-10">
+        <aside className="bg-white h-full w-20 flex-shrink-0 border-r border-slate-100/50 flex flex-col items-center py-6 gap-6 z-10">
           <nav className="flex-1 flex flex-col gap-4 items-center w-full">
             <a className="flex items-center justify-center w-11 h-11 bg-primary text-white rounded-2xl shadow-lg shadow-primary/20 transition-all duration-300 hover:scale-105" href="#" title="Live Map">
               <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>map</span>
