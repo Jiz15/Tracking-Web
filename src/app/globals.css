@@ -157,24 +157,24 @@ body {
 
 /* Dark Mode overrides */
 .dark body {
-  background-color: #020617 !important; /* Slate 950 */
+  background-color: #030712 !important; /* Midnight Black */
   color: #f1f5f9 !important;
 }
 
 .dark header {
-  background-color: rgba(15, 23, 42, 0.75) !important;
+  background-color: rgba(3, 7, 18, 0.94) !important; /* Opaque Midnight */
   border-bottom-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 .dark aside {
-  background-color: rgba(15, 23, 42, 0.45) !important;
-  border-right-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: rgba(2, 4, 10, 0.97) !important; /* Deep Dark Sidebar */
+  border-right-color: rgba(255, 255, 255, 0.04) !important;
 }
 
 .dark .glass-panel {
-  background: rgba(15, 23, 42, 0.75) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+  background: rgba(3, 7, 18, 0.92) !important; /* Thick Midnight Glass */
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
 }
 
 /* Text color overrides */
@@ -197,15 +197,15 @@ body {
 
 /* Background overrides */
 .dark .bg-white {
-  background-color: #0f172a !important; /* Slate 900 */
+  background-color: #0b0f19 !important; /* Midnight Slate */
 }
 
 .dark .bg-slate-50 {
-  background-color: #0f172a !important; /* Slate 900 */
+  background-color: #0b0f19 !important; /* Midnight Slate */
 }
 
 .dark .bg-white\/50 {
-  background-color: rgba(15, 23, 42, 0.5) !important;
+  background-color: rgba(3, 7, 18, 0.4) !important;
 }
 
 .dark .bg-slate-900 {
