@@ -257,6 +257,7 @@ export default function Home() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "IDLE" | "STOP">("ALL");
+  const [isListShrunk, setIsListShrunk] = useState(false);
 
   // Customize floating panel checkboxes
   const [displayFields, setDisplayFields] = useState({
@@ -770,202 +771,253 @@ export default function Home() {
           <div className="absolute inset-0 map-vignette pointer-events-none z-10"></div>
 
           {/* Floating Vehicle Panel */}
-          <div className="absolute top-6 left-6 bottom-6 w-80 z-20 flex flex-col gap-4">
-            <div className="glass-panel rounded-3xl p-5 flex flex-col h-full floating-ui overflow-hidden">
+          <div className={`absolute top-6 left-6 bottom-6 z-20 flex flex-col gap-4 transition-all duration-300 ease-in-out ${isListShrunk && !selectedVehicle ? 'w-20' : 'w-80'}`}>
+            <div className={`glass-panel rounded-3xl flex flex-col h-full floating-ui overflow-hidden transition-all duration-300 ease-in-out ${isListShrunk && !selectedVehicle ? 'p-3' : 'p-5'}`}>
               
               {/* Conditional Panel Rendering: List vs Detail */}
               {!selectedVehicle ? (
-                <>
-                  {/* Fleet List Panel */}
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-3">
-                    </div>
+                isListShrunk ? (
+                  <div className="flex flex-col items-center gap-3 h-full overflow-hidden w-full">
+                    {/* Expand Trigger Button */}
+                    <button
+                      onClick={() => setIsListShrunk(false)}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/50 border border-white/80 text-slate-500 hover:text-primary hover:bg-white transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm shrink-0"
+                      title="Expand Panel"
+                    >
+                      <span className="material-symbols-outlined text-[24px]">keyboard_double_arrow_right</span>
+                    </button>
                     
-                    {/* Search inside floating panel for mobile/compact view */}
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">search</span>
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-white/50 border border-white/80 rounded-2xl pl-9 pr-4 py-2 text-xs text-on-surface focus:ring-0 focus:outline-none transition-all placeholder:text-slate-400"
-                        placeholder="Filter vehicles..."
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between mt-3 px-1 py-1.5 border-t border-white/30">
-                      <div className="flex items-center gap-1">
-                        <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/50 text-slate-500 transition-colors">
-                          <span className="material-symbols-outlined text-[16px]">pause</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setLastSyncTime(new Date());
-                            setCountdown(30);
-                          }}
-                          className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/50 text-slate-500 transition-colors"
-                          title="Force Refresh Data"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">refresh</span>
-                        </button>
-                        <span className="text-[9px] font-mono text-slate-400 ml-1 font-medium">{countdown}s</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 cursor-pointer hover:bg-white/50 px-1.5 py-0.5 rounded transition-colors">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Auto: 30s</span>
-                        <span className="material-symbols-outlined text-[12px] text-slate-400">expand_more</span>
-                      </div>
-
-                      <div className="relative">
-                        <button
-                          onClick={() => setIsCustomizeOpen(!isCustomizeOpen)}
-                          className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/50 transition-colors ml-1 ${isCustomizeOpen ? "bg-white/60 text-primary" : "text-slate-500"}`}
-                          title="Customization"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">tune</span>
-                        </button>
-                        
-                        {/* Customization Dropdown */}
-                        {isCustomizeOpen && (
-                          <div className="absolute right-0 top-full mt-2 w-40 glass-panel rounded-xl p-3 shadow-xl border border-white/80 z-50">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Display Fields</p>
-                            <div className="flex flex-col gap-2">
-                              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50/50 p-1 rounded transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={displayFields.address}
-                                  onChange={(e) => setDisplayFields({ ...displayFields, address: e.target.checked })}
-                                  className="w-3 h-3 rounded border-slate-300 text-primary focus:ring-primary/20 bg-transparent"
-                                />
-                                <span className="text-[11px] text-slate-600">Address</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50/50 p-1 rounded transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={displayFields.odometer}
-                                  onChange={(e) => setDisplayFields({ ...displayFields, odometer: e.target.checked })}
-                                  className="w-3 h-3 rounded border-slate-300 text-primary focus:ring-primary/20 bg-transparent"
-                                />
-                                <span className="text-[11px] text-slate-600">Odometer</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50/50 p-1 rounded transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={displayFields.temperature}
-                                  onChange={(e) => setDisplayFields({ ...displayFields, temperature: e.target.checked })}
-                                  className="w-3 h-3 rounded border-slate-300 text-primary focus:ring-primary/20 bg-transparent"
-                                />
-                                <span className="text-[11px] text-slate-600">Cargo Temp</span>
-                              </label>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Filter Status buttons */}
-                    <div className="flex gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar">
-                      <button
-                        onClick={() => setStatusFilter("ALL")}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${statusFilter === "ALL" ? "bg-primary/10 border-primary/30 text-primary" : "bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100"}`}
-                      >
-                        ALL ({vehicles.length})
-                      </button>
-                      <button
-                        onClick={() => setStatusFilter("ACTIVE")}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${statusFilter === "ACTIVE" ? "bg-emerald-50 border-emerald-100 text-emerald-600" : "bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100"}`}
-                      >
-                        <span className="material-symbols-outlined text-[16px]">navigation</span>
-                        {stats.active}
-                      </button>
-                      <button
-                        onClick={() => setStatusFilter("IDLE")}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${statusFilter === "IDLE" ? "bg-amber-50 border-amber-100 text-amber-600" : "bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100"}`}
-                      >
-                        <span className="material-symbols-outlined text-[16px]">pause</span>
-                        {stats.idle}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Vehicles List Container */}
-                  <div className="flex-1 overflow-y-auto pr-1 -mr-1 no-scrollbar border-t border-slate-100/50">
-                    {filteredVehicles.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <span className="material-symbols-outlined text-[36px] text-slate-300 mb-2">local_shipping</span>
-                        <p className="text-xs font-bold text-slate-400">No vehicles match filters.</p>
-                      </div>
-                    ) : (
-                      filteredVehicles.map((vehicle) => (
+                    <div className="w-full border-b border-slate-100/50 shrink-0"></div>
+                    
+                    {/* Scrollable list of vehicle status avatars */}
+                    <div className="flex-1 overflow-y-auto w-full flex flex-col gap-3 py-1 no-scrollbar items-center">
+                      {vehicles.map((v) => (
                         <div
-                          key={vehicle.id}
-                          onClick={() => setSelectedVehicleId(vehicle.id)}
-                          className="group cursor-pointer border-b border-slate-100 last:border-b-0"
+                          key={`shrink-rail-${v.id}`}
+                          onClick={() => setSelectedVehicleId(v.id)}
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 ${
+                            v.status === "ACTIVE"
+                              ? "bg-emerald-50 border border-emerald-100"
+                              : v.status === "IDLE"
+                              ? "bg-amber-50 border border-amber-100"
+                              : "bg-slate-50 border border-slate-100"
+                          }`}
+                          title={`${v.id} | ${v.name}`}
                         >
-                          <div className="p-3 hover:bg-slate-50/80 transition-colors">
-                            <div className="flex items-start gap-3">
-                              {/* Vehicle Image */}
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden border shrink-0 mt-0.5 relative ${vehicle.status === "ACTIVE" ? "bg-emerald-50 border-emerald-100" : vehicle.status === "IDLE" ? "bg-amber-50 border-amber-100" : "bg-slate-50 border-slate-100"}`}>
-                                <Image
-                                  alt={vehicle.name}
-                                  fill
-                                  sizes="40px"
-                                  className="object-cover"
-                                  src={vehicle.image}
-                                />
-                              </div>
-                              
-                              {/* Details text */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start">
-                                  <p className="font-bold text-[12px] text-slate-800 truncate">{vehicle.id} | {vehicle.name}</p>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <span className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer">expand_more</span>
-                                    <span className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer">more_vert</span>
-                                  </div>
-                                </div>
-                                
-                                {/* Display fields controlled by tune setting */}
-                                <div className="flex flex-col gap-0.5 mt-0.5 mb-1.5">
-                                  {displayFields.address && (
-                                    <div className="flex items-center gap-1 text-slate-500">
-                                      <span className="material-symbols-outlined text-[12px] shrink-0">location_on</span>
-                                      <span className="text-[10px] truncate">{vehicle.location}</span>
-                                    </div>
-                                  )}
-                                  {displayFields.odometer && (
-                                    <div className="flex items-center gap-1 text-slate-500">
-                                      <span className="material-symbols-outlined text-[12px] shrink-0">speed</span>
-                                      <span className="text-[10px]">{vehicle.odometer}</span>
-                                    </div>
-                                  )}
-                                  {displayFields.temperature && (
-                                    <div className="flex items-center gap-1 text-slate-500">
-                                      <span className="material-symbols-outlined text-[12px] shrink-0">thermostat</span>
-                                      <span className="text-[10px] text-amber-600 font-mono">Zone A: {vehicle.sensors.zoneA}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${vehicle.status === "ACTIVE" ? "bg-emerald-500" : vehicle.status === "IDLE" ? "bg-slate-400" : "bg-red-500"}`}></span>
-                                    <span className="text-[10px] text-slate-400 truncate font-mono">
-                                      {vehicle.status === "ACTIVE" ? "Live" : vehicle.status === "IDLE" ? "Idle" : "Stop"}
-                                    </span>
-                                  </div>
-                                  <span className={`text-[10px] font-bold ${vehicle.status === "ACTIVE" ? "text-emerald-600" : "text-amber-600"}`}>
-                                    {vehicle.speed > 0 ? `${vehicle.speed} km/h` : "0 km/h"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
+                          <div className="w-10 h-10 relative rounded-lg overflow-hidden">
+                            <Image
+                              alt={v.name}
+                              fill
+                              sizes="40px"
+                              className="object-cover"
+                              src={v.image}
+                            />
                           </div>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </>
+                ) : (
+                  <>
+                    {/* Fleet List Panel */}
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h2 className="text-[16px] font-bold text-slate-800 tracking-tight font-outfit">Fleet Operations</h2>
+                        <button
+                          onClick={() => setIsListShrunk(true)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100/80 text-slate-500 hover:text-primary transition-all duration-200 hover:scale-105 active:scale-95"
+                          title="Collapse Panel"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">keyboard_double_arrow_left</span>
+                        </button>
+                      </div>
+                      
+                      {/* Search inside floating panel for mobile/compact view */}
+                      <div className="relative">
+                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">search</span>
+                        <input
+                          type="text"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full bg-white/50 border border-white/80 rounded-2xl pl-9 pr-4 py-2 text-xs text-on-surface focus:ring-0 focus:outline-none transition-all placeholder:text-slate-400"
+                          placeholder="Filter vehicles..."
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between mt-3 px-1 py-1.5 border-t border-white/30">
+                        <div className="flex items-center gap-1">
+                          <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/50 text-slate-500 transition-colors">
+                            <span className="material-symbols-outlined text-[16px]">pause</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setLastSyncTime(new Date());
+                              setCountdown(30);
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/50 text-slate-500 transition-colors"
+                            title="Force Refresh Data"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">refresh</span>
+                          </button>
+                          <span className="text-[9px] font-mono text-slate-400 ml-1 font-medium">{countdown}s</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-1 cursor-pointer hover:bg-white/50 px-1.5 py-0.5 rounded transition-colors">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Auto: 30s</span>
+                          <span className="material-symbols-outlined text-[12px] text-slate-400">expand_more</span>
+                        </div>
+
+                        <div className="relative">
+                          <button
+                            onClick={() => setIsCustomizeOpen(!isCustomizeOpen)}
+                            className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/50 transition-colors ml-1 ${isCustomizeOpen ? "bg-white/60 text-primary" : "text-slate-500"}`}
+                            title="Customization"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">tune</span>
+                          </button>
+                          
+                          {/* Customization Dropdown */}
+                          {isCustomizeOpen && (
+                            <div className="absolute right-0 top-full mt-2 w-40 glass-panel rounded-xl p-3 shadow-xl border border-white/80 z-50">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Display Fields</p>
+                              <div className="flex flex-col gap-2">
+                                <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50/50 p-1 rounded transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={displayFields.address}
+                                    onChange={(e) => setDisplayFields({ ...displayFields, address: e.target.checked })}
+                                    className="w-3 h-3 rounded border-slate-300 text-primary focus:ring-primary/20 bg-transparent"
+                                  />
+                                  <span className="text-[11px] text-slate-600">Address</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50/50 p-1 rounded transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={displayFields.odometer}
+                                    onChange={(e) => setDisplayFields({ ...displayFields, odometer: e.target.checked })}
+                                    className="w-3 h-3 rounded border-slate-300 text-primary focus:ring-primary/20 bg-transparent"
+                                  />
+                                  <span className="text-[11px] text-slate-600">Odometer</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50/50 p-1 rounded transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={displayFields.temperature}
+                                    onChange={(e) => setDisplayFields({ ...displayFields, temperature: e.target.checked })}
+                                    className="w-3 h-3 rounded border-slate-300 text-primary focus:ring-primary/20 bg-transparent"
+                                  />
+                                  <span className="text-[11px] text-slate-600">Cargo Temp</span>
+                                </label>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Filter Status buttons */}
+                      <div className="flex gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar">
+                        <button
+                          onClick={() => setStatusFilter("ALL")}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${statusFilter === "ALL" ? "bg-primary/10 border-primary/30 text-primary" : "bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100"}`}
+                        >
+                          ALL ({vehicles.length})
+                        </button>
+                        <button
+                          onClick={() => setStatusFilter("ACTIVE")}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${statusFilter === "ACTIVE" ? "bg-emerald-50 border-emerald-100 text-emerald-600" : "bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100"}`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">navigation</span>
+                          {stats.active}
+                        </button>
+                        <button
+                          onClick={() => setStatusFilter("IDLE")}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${statusFilter === "IDLE" ? "bg-amber-50 border-amber-100 text-amber-600" : "bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-100"}`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">pause</span>
+                          {stats.idle}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Vehicles List Container */}
+                    <div className="flex-1 overflow-y-auto pr-1 -mr-1 no-scrollbar border-t border-slate-100/50">
+                      {filteredVehicles.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <span className="material-symbols-outlined text-[36px] text-slate-300 mb-2">local_shipping</span>
+                          <p className="text-xs font-bold text-slate-400">No vehicles match filters.</p>
+                        </div>
+                      ) : (
+                        filteredVehicles.map((vehicle) => (
+                          <div
+                            key={vehicle.id}
+                            onClick={() => setSelectedVehicleId(vehicle.id)}
+                            className="group cursor-pointer border-b border-slate-100 last:border-b-0"
+                          >
+                            <div className="p-3 hover:bg-slate-50/80 transition-colors">
+                              <div className="flex items-start gap-3">
+                                {/* Vehicle Image */}
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden border shrink-0 mt-0.5 relative ${vehicle.status === "ACTIVE" ? "bg-emerald-50 border-emerald-100" : vehicle.status === "IDLE" ? "bg-amber-50 border-amber-100" : "bg-slate-50 border-slate-100"}`}>
+                                  <Image
+                                    alt={vehicle.name}
+                                    fill
+                                    sizes="40px"
+                                    className="object-cover"
+                                    src={vehicle.image}
+                                  />
+                                </div>
+                                
+                                {/* Details text */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-start">
+                                    <p className="font-bold text-[12px] text-slate-800 truncate">{vehicle.id} | {vehicle.name}</p>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer">expand_more</span>
+                                      <span className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer">more_vert</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Display fields controlled by tune setting */}
+                                  <div className="flex flex-col gap-0.5 mt-0.5 mb-1.5">
+                                    {displayFields.address && (
+                                      <div className="flex items-center gap-1 text-slate-500">
+                                        <span className="material-symbols-outlined text-[12px] shrink-0">location_on</span>
+                                        <span className="text-[10px] truncate">{vehicle.location}</span>
+                                      </div>
+                                    )}
+                                    {displayFields.odometer && (
+                                      <div className="flex items-center gap-1 text-slate-500">
+                                        <span className="material-symbols-outlined text-[12px] shrink-0">speed</span>
+                                        <span className="text-[10px]">{vehicle.odometer}</span>
+                                      </div>
+                                    )}
+                                    {displayFields.temperature && (
+                                      <div className="flex items-center gap-1 text-slate-500">
+                                        <span className="material-symbols-outlined text-[12px] shrink-0">thermostat</span>
+                                        <span className="text-[10px] text-amber-600 font-mono">Zone A: {vehicle.sensors.zoneA}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`w-1.5 h-1.5 rounded-full ${vehicle.status === "ACTIVE" ? "bg-emerald-500" : vehicle.status === "IDLE" ? "bg-slate-400" : "bg-red-500"}`}></span>
+                                      <span className="text-[10px] text-slate-400 truncate font-mono">
+                                        {vehicle.status === "ACTIVE" ? "Live" : vehicle.status === "IDLE" ? "Idle" : "Stop"}
+                                      </span>
+                                    </div>
+                                    <span className={`text-[10px] font-bold ${vehicle.status === "ACTIVE" ? "text-emerald-600" : "text-amber-600"}`}>
+                                      {vehicle.speed > 0 ? `${vehicle.speed} km/h` : "0 km/h"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )
               ) : (
                 <div className="flex h-full overflow-hidden w-full">
                   
