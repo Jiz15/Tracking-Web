@@ -797,7 +797,7 @@ export default function Home() {
         <div className="flex items-center gap-stack-lg">
           <div className="relative h-8 w-36 flex items-center">
             <Image
-              src="/logo.png"
+              src={theme === "dark" ? "/logo_dark.png" : "/logo.png"}
               alt="TouchTrack Logo"
               fill
               sizes="144px"

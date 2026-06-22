@@ -162,7 +162,7 @@ body {
 }
 
 .dark header {
-  background-color: rgba(3, 7, 18, 0.94) !important; /* Opaque Midnight */
+  background-color: #02040a !important; /* Solid Midnight Black */
   border-bottom-color: rgba(255, 255, 255, 0.05) !important;
 }
 
@@ -182,12 +182,14 @@ body {
 .dark .text-slate-900,
 .dark h3,
 .dark h2,
-.dark .text-slate-700 {
+.dark .text-slate-700,
+.dark .text-on-surface {
   color: #f8fafc !important; /* Slate 50 */
 }
 
 .dark .text-slate-500,
-.dark .text-slate-600 {
+.dark .text-slate-600,
+.dark .text-on-surface-variant {
   color: #cbd5e1 !important; /* Slate 300 */
 }
 
