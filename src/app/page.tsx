@@ -278,6 +278,13 @@ export default function Home() {
 
   // Map state and tracking refs
   const [map, setMap] = useState<LeafletMap | null>(null);
+  const [lockedVehicles, setLockedVehicles] = useState<string[]>([]);
+  const lockedVehiclesRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    lockedVehiclesRef.current = lockedVehicles;
+  }, [lockedVehicles]);
+
   const markersRef = useRef<{ [key: string]: LeafletMarker }>({});
   const prevSelectedIdRef = useRef<string | null>(null);
   const routePolylinesRef = useRef<LeafletPolyline[]>([]);
@@ -417,6 +424,70 @@ export default function Home() {
   useEffect(() => {
     if (!map) return;
 
+    // Listen for popup open on the map to bind action listeners
+    const onPopupOpen = (e: { popup: { getElement: () => HTMLElement | null } }) => {
+      const popupElement = e.popup.getElement();
+      if (!popupElement) return;
+
+      const geofenceBtn = popupElement.querySelector("[id^='pop-geofence-']");
+      const poiBtn = popupElement.querySelector("[id^='pop-poi-']");
+      const lockBtn = popupElement.querySelector("[id^='pop-lock-']");
+
+      if (geofenceBtn) {
+        const vId = geofenceBtn.id.replace("pop-geofence-", "");
+        geofenceBtn.addEventListener("click", () => {
+          alert(`Geofence creation mode activated for vehicle ${vId}`);
+        });
+      }
+
+      if (poiBtn) {
+        const vId = poiBtn.id.replace("pop-poi-", "");
+        poiBtn.addEventListener("click", () => {
+          alert(`Point of Interest (POI) marked at current coordinates for vehicle ${vId}`);
+        });
+      }
+
+      if (lockBtn) {
+        const vId = lockBtn.id.replace("pop-lock-", "");
+        lockBtn.addEventListener("click", () => {
+          setLockedVehicles((prev) => {
+            const isCurrentlyLocked = prev.includes(vId);
+            let next;
+            if (isCurrentlyLocked) {
+              next = prev.filter((id) => id !== vId);
+              alert(`Vehicle ${vId} unlocked successfully.`);
+            } else {
+              next = [...prev, vId];
+              alert(`Vehicle ${vId} secured and locked.`);
+            }
+
+            // Update UI elements in active popup directly
+            const escapedId = vId.replace(" ", "\\ ");
+            const lockIcon = popupElement.querySelector(`#pop-lock-icon-${escapedId}`);
+            const lockText = popupElement.querySelector(`#pop-lock-text-${escapedId}`);
+            const lockBtnEl = popupElement.querySelector(`#pop-lock-${escapedId}`);
+
+            if (lockIcon && lockText && lockBtnEl) {
+              if (isCurrentlyLocked) {
+                lockIcon.textContent = "lock_open";
+                lockText.textContent = "Lock";
+                lockBtnEl.classList.remove("border-red-200", "bg-red-50/50", "text-red-600");
+                lockBtnEl.classList.add("border-slate-100", "hover:bg-slate-50", "text-slate-600");
+              } else {
+                lockIcon.textContent = "lock";
+                lockText.textContent = "Unlock";
+                lockBtnEl.classList.remove("border-slate-100", "hover:bg-slate-50", "text-slate-600");
+                lockBtnEl.classList.add("border-red-200", "bg-red-50/50", "text-red-600");
+              }
+            }
+            return next;
+          });
+        });
+      }
+    };
+
+    map.on("popupopen", onPopupOpen);
+
     const activeMarkers: { [key: string]: LeafletMarker } = {};
 
     import("leaflet").then((LModule) => {
@@ -425,6 +496,7 @@ export default function Home() {
       vehicles.forEach((v) => {
         const isSelected = v.id === selectedVehicleId;
         const latlng: [number, number] = [v.lat, v.lng];
+        const isLocked = lockedVehiclesRef.current.includes(v.id);
 
         // Create Custom HTML Pin Marker
         const iconHtml = `
@@ -451,6 +523,56 @@ export default function Home() {
           </div>
         `;
 
+        const popupHtml = `
+          <div class="p-3 font-outfit text-slate-800 min-w-[240px]">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+              <span class="font-bold text-[12px] text-slate-800">${v.id} | ${v.name}</span>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                v.status === "ACTIVE"
+                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                  : v.status === "IDLE"
+                  ? "bg-amber-50 text-amber-600 border border-amber-100"
+                  : "bg-rose-50 text-rose-600 border border-rose-100"
+              }">
+                ${v.status === "ACTIVE" ? "LIVE" : v.status}
+              </span>
+            </div>
+            
+            <div class="space-y-2 text-[11px] text-slate-600 mb-3">
+              <div class="flex items-start gap-1">
+                <span class="material-symbols-outlined text-[13px] text-slate-400 mt-0.5">location_on</span>
+                <span class="flex-1">${v.location}</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
+                <span>Duration: <strong>${v.tripMetrics.duration}</strong></span>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-2 flex flex-col gap-1.5">
+              <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Actions</div>
+              <div class="grid grid-cols-3 gap-1">
+                <button id="pop-geofence-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px] mb-0.5">pentagon</span>
+                  <span class="text-[9px] font-medium font-sans">Geofence</span>
+                </button>
+                <button id="pop-poi-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px] mb-0.5">pin_drop</span>
+                  <span class="text-[9px] font-medium font-sans">POI</span>
+                </button>
+                <button id="pop-lock-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                  isLocked 
+                    ? "border-red-200 bg-red-50/50 text-red-600" 
+                    : "border-slate-100 hover:bg-slate-50 text-slate-600"
+                }">
+                  <span class="material-symbols-outlined text-[16px] mb-0.5" id="pop-lock-icon-${v.id}">${isLocked ? 'lock' : 'lock_open'}</span>
+                  <span class="text-[9px] font-medium font-sans" id="pop-lock-text-${v.id}">${isLocked ? 'Unlock' : 'Lock'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
         const customIcon = L.divIcon({
           html: iconHtml,
           className: "group custom-marker-pin",
@@ -460,6 +582,12 @@ export default function Home() {
 
         const marker = L.marker(latlng, { icon: customIcon })
           .addTo(map)
+          .bindPopup(popupHtml, {
+            className: "custom-leaflet-popup",
+            maxWidth: 285,
+            minWidth: 245,
+            offset: [0, -12]
+          })
           .on("click", () => {
             setSelectedVehicleId(v.id);
           });
@@ -538,6 +666,15 @@ export default function Home() {
       // Track markers ref for updates
       markersRef.current = activeMarkers;
 
+      // If a vehicle is selected, open its popup automatically
+      if (selectedVehicleId && activeMarkers[selectedVehicleId]) {
+        setTimeout(() => {
+          if (activeMarkers[selectedVehicleId]) {
+            activeMarkers[selectedVehicleId].openPopup();
+          }
+        }, 120);
+      }
+
       // Handle pan / zoom transitions on selected ID change
       const selectionChanged = selectedVehicleId !== prevSelectedIdRef.current;
       prevSelectedIdRef.current = selectedVehicleId;
@@ -559,6 +696,8 @@ export default function Home() {
     });
 
     return () => {
+      map.off("popupopen", onPopupOpen);
+
       // Cleanup all layers when effects re-run or unmount
       Object.values(markersRef.current).forEach((marker) => {
         if (map) map.removeLayer(marker);
@@ -795,7 +934,7 @@ export default function Home() {
                         <div
                           key={`shrink-rail-${v.id}`}
                           onClick={() => setSelectedVehicleId(v.id)}
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 ${
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 relative ${
                             v.status === "ACTIVE"
                               ? "bg-emerald-50 border border-emerald-100"
                               : v.status === "IDLE"
@@ -813,6 +952,11 @@ export default function Home() {
                               src={v.image}
                             />
                           </div>
+                          {lockedVehicles.includes(v.id) && (
+                            <div className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center shadow-md z-10 border border-white scale-90">
+                              <span className="material-symbols-outlined text-[9px] font-bold">lock</span>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -964,6 +1108,11 @@ export default function Home() {
                                     className="object-cover"
                                     src={vehicle.image}
                                   />
+                                  {lockedVehicles.includes(vehicle.id) && (
+                                    <div className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center shadow-md z-10 border border-white scale-90">
+                                      <span className="material-symbols-outlined text-[8px] font-bold">lock</span>
+                                    </div>
+                                  )}
                                 </div>
                                 
                                 {/* Details text */}
@@ -1029,7 +1178,7 @@ export default function Home() {
                         <div
                           key={`shrink-${v.id}`}
                           onClick={() => setSelectedVehicleId(v.id)}
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mx-auto cursor-pointer transition-all duration-200 ${
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mx-auto cursor-pointer transition-all duration-200 relative ${
                             isSelected
                               ? "ring-2 ring-primary ring-offset-2 opacity-100 scale-105"
                               : "opacity-50 hover:opacity-85"
@@ -1051,6 +1200,11 @@ export default function Home() {
                               src={v.image}
                             />
                           </div>
+                          {lockedVehicles.includes(v.id) && (
+                            <div className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center shadow-md z-10 border border-white scale-90">
+                              <span className="material-symbols-outlined text-[9px] font-bold">lock</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1087,11 +1241,18 @@ export default function Home() {
                             src={selectedVehicle.image}
                           />
                         </div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`w-2 h-2 rounded-full ${selectedVehicle.status === "ACTIVE" ? "bg-emerald-500 animate-pulse" : selectedVehicle.status === "IDLE" ? "bg-amber-500" : "bg-red-500"}`}></span>
-                          <span className={`text-[10px] font-bold uppercase tracking-widest ${selectedVehicle.status === "ACTIVE" ? "text-emerald-600" : selectedVehicle.status === "IDLE" ? "text-amber-600" : "text-red-500"}`}>
-                            {selectedVehicle.status === "ACTIVE" ? "Live" : selectedVehicle.status.toLowerCase()}
-                          </span>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${selectedVehicle.status === "ACTIVE" ? "bg-emerald-500 animate-pulse" : selectedVehicle.status === "IDLE" ? "bg-amber-500" : "bg-red-500"}`}></span>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest ${selectedVehicle.status === "ACTIVE" ? "text-emerald-600" : selectedVehicle.status === "IDLE" ? "text-amber-600" : "text-red-500"}`}>
+                              {selectedVehicle.status === "ACTIVE" ? "Live" : selectedVehicle.status.toLowerCase()}
+                            </span>
+                          </div>
+                          {lockedVehicles.includes(selectedVehicle.id) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-600 text-[8px] font-bold uppercase tracking-wider">
+                              <span className="material-symbols-outlined text-[10px]">lock</span> Secured
+                            </span>
+                          )}
                         </div>
                         <h3 className="text-[16px] font-bold text-slate-800 leading-tight">{selectedVehicle.id} | {selectedVehicle.name}</h3>
                         <div className="flex items-center gap-1 mt-1 text-slate-500">
@@ -1103,10 +1264,28 @@ export default function Home() {
                       {/* Main Action Buttons */}
                       <div className="flex gap-1.5">
                         <button
-                          onClick={() => alert(`Map tracking locked on vehicle ${selectedVehicle.id}`)}
-                          className="flex-1 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 flex items-center justify-center gap-1 hover:bg-slate-100 transition-colors"
+                          onClick={() => {
+                            setLockedVehicles((prev) => {
+                              const isCurrentlyLocked = prev.includes(selectedVehicle.id);
+                              if (isCurrentlyLocked) {
+                                alert(`Vehicle ${selectedVehicle.id} unlocked successfully.`);
+                                return prev.filter((id) => id !== selectedVehicle.id);
+                              } else {
+                                alert(`Vehicle ${selectedVehicle.id} secured and locked.`);
+                                return [...prev, selectedVehicle.id];
+                              }
+                            });
+                          }}
+                          className={`flex-1 py-1.5 border rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all duration-200 ${
+                            lockedVehicles.includes(selectedVehicle.id)
+                              ? "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100/50"
+                              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
                         >
-                          <span className="material-symbols-outlined text-[16px]">lock_open</span> Lock
+                          <span className="material-symbols-outlined text-[16px]">
+                            {lockedVehicles.includes(selectedVehicle.id) ? "lock" : "lock_open"}
+                          </span>{" "}
+                          {lockedVehicles.includes(selectedVehicle.id) ? "Unlock" : "Lock"}
                         </button>
                         <button
                           onClick={() => alert(`Generated coordinate share link for ${selectedVehicle.id}`)}
