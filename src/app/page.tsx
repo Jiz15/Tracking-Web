@@ -251,23 +251,59 @@ function findClosestPointIndex(path: [number, number][], current: [number, numbe
   return closestIndex;
 }
 
-// Helper to get historical path or generate mock path if not predefined
-function getVehiclePath(vId: string, vehiclesList: Vehicle[]): [number, number][] {
+// Helper to get historical path or generate mock path if not predefined, filtered by dates
+function getVehiclePath(vId: string, vehiclesList: Vehicle[], startDate?: string, endDate?: string): [number, number][] {
+  let basePath: [number, number][] = [];
   if (ROUTE_DETAILS[vId]) {
-    return ROUTE_DETAILS[vId].path;
+    basePath = [...ROUTE_DETAILS[vId].path];
+  } else {
+    const v = vehiclesList.find(x => x.id === vId);
+    const lat = v ? v.lat : 25.12;
+    const lng = v ? v.lng : 55.2;
+    basePath = [
+      [lat - 0.05, lng - 0.05],
+      [lat - 0.03, lng - 0.02],
+      [lat - 0.015, lng - 0.01],
+      [lat, lng],
+      [lat + 0.015, lng + 0.01],
+      [lat + 0.035, lng + 0.02],
+      [lat + 0.05, lng + 0.05]
+    ];
   }
-  const v = vehiclesList.find(x => x.id === vId);
-  const lat = v ? v.lat : 25.12;
-  const lng = v ? v.lng : 55.2;
-  return [
-    [lat - 0.05, lng - 0.05],
-    [lat - 0.03, lng - 0.02],
-    [lat - 0.015, lng - 0.01],
-    [lat, lng],
-    [lat + 0.015, lng + 0.01],
-    [lat + 0.035, lng + 0.02],
-    [lat + 0.05, lng + 0.05]
-  ];
+
+  if (startDate && endDate) {
+    const startNum = new Date(startDate).getTime() || 0;
+    const endNum = new Date(endDate).getTime() || 0;
+    const seed = startNum + endNum;
+    if (seed) {
+      // Deterministically shift inner path points to simulate different route calculations for different timeframes
+      return basePath.map(([lat, lng], idx) => {
+        if (idx === 0 || idx === basePath.length - 1) return [lat, lng];
+        const angle = (seed + idx * 37) % 360;
+        const rad = (angle * Math.PI) / 180;
+        const offsetLat = Math.sin(rad) * 0.003;
+        const offsetLng = Math.cos(rad) * 0.003;
+        return [lat + offsetLat, lng + offsetLng];
+      });
+    }
+  }
+
+  return basePath;
+}
+
+// Helper to compute a simulated time along the route
+function getPlaybackTime(index: number, pathLength: number, startStr: string, endStr: string): string {
+  try {
+    const start = new Date(startStr).getTime();
+    const end = new Date(endStr).getTime();
+    if (isNaN(start) || isNaN(end) || end <= start) {
+      return "";
+    }
+    const timeAtStep = start + (index / Math.max(1, pathLength - 1)) * (end - start);
+    return new Date(timeAtStep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(timeAtStep).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } catch {
+    return "";
+  }
 }
 
 export default function Home() {
@@ -278,6 +314,10 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "IDLE" | "STOP">("ALL");
   const [isListShrunk, setIsListShrunk] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [L, setL] = useState<any>(null);
+  const [profileModalVehicleId, setProfileModalVehicleId] = useState<string | null>(null);
+  const [reportModalVehicleId, setReportModalVehicleId] = useState<string | null>(null);
   const [activeMenuVehicleId, setActiveMenuVehicleId] = useState<string | null>(null);
   const [isDetailMenuOpen, setIsDetailMenuOpen] = useState(false);
   const [historyVehicleId, setHistoryVehicleId] = useState<string | null>(null);
@@ -328,7 +368,7 @@ export default function Home() {
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isPlayingHistory && historyVehicleId) {
-      const path = getVehiclePath(historyVehicleId, vehicles);
+      const path = getVehiclePath(historyVehicleId, vehicles, historyStartDate, historyEndDate);
       interval = setInterval(() => {
         setHistoryPlaybackIndex((prev) => {
           if (prev >= path.length - 1) {
@@ -342,7 +382,7 @@ export default function Home() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPlayingHistory, historyVehicleId, vehicles]);
+  }, [isPlayingHistory, historyVehicleId, vehicles, historyStartDate, historyEndDate]);
 
   // Customize floating panel checkboxes
   const [displayFields, setDisplayFields] = useState({
@@ -372,6 +412,7 @@ export default function Home() {
   }, [lockedVehicles]);
 
   const markersRef = useRef<{ [key: string]: LeafletMarker }>({});
+  const tileLayerRef = useRef<LeafletTileLayer | null>(null);
   const prevSelectedIdRef = useRef<string | null>(null);
   const routePolylinesRef = useRef<LeafletPolyline[]>([]);
   const routeMarkersRef = useRef<LeafletMarker[]>([]);
@@ -447,14 +488,15 @@ export default function Home() {
     let mapInstance: LeafletMap | null = null;
 
     const setupMap = async () => {
-      const L = (await import("leaflet")).default;
+      const LInstance = (await import("leaflet")).default;
       if (!active) return;
+      setL(LInstance);
 
       const container = document.getElementById("map-container");
       if (!container) return;
 
       // Initialize Leaflet Map
-      mapInstance = L.map("map-container", {
+      mapInstance = LInstance.map("map-container", {
         zoomControl: false,
         attributionControl: false,
       }).setView([25.12, 55.2], 11);
@@ -463,14 +505,14 @@ export default function Home() {
       const savedTheme = localStorage.getItem("theme");
       const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const initialDark = savedTheme === "dark" || (!savedTheme && isSystemDark);
-      const baseLayer = L.tileLayer(
+      const baseLayer = LInstance.tileLayer(
         initialDark
           ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
         { maxZoom: 18 }
       ).addTo(mapInstance);
 
-      Object.assign(mapInstance, { _tileLayer: baseLayer });
+      tileLayerRef.current = baseLayer;
 
       // Sync zoom state
       mapInstance.on("zoomend", () => {
@@ -492,29 +534,25 @@ export default function Home() {
 
   // Update map layer on theme toggle (vector vs satellite vs dark)
   useEffect(() => {
-    if (map) {
-      const customMap = map as CustomMap;
-      if (customMap._tileLayer) {
-        map.removeLayer(customMap._tileLayer);
+    if (map && L) {
+      if (tileLayerRef.current) {
+        map.removeLayer(tileLayerRef.current);
       }
 
-      import("leaflet").then((LModule) => {
-        const L = LModule.default;
-        let url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
-        if (satelliteView) {
-          url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-        } else if (theme === "dark") {
-          url = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-        }
-        const newLayer = L.tileLayer(url, { maxZoom: 18 }).addTo(map);
-        customMap._tileLayer = newLayer;
-      });
+      let url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+      if (satelliteView) {
+        url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+      } else if (theme === "dark") {
+        url = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+      }
+      const newLayer = L.tileLayer(url, { maxZoom: 18 }).addTo(map);
+      tileLayerRef.current = newLayer;
     }
-  }, [map, satelliteView, theme]);
+  }, [map, L, satelliteView, theme]);
 
   // Update markers coordinates, active outline rings, and route path polylines
   useEffect(() => {
-    if (!map) return;
+    if (!map || !L) return;
 
     // Listen for popup open on the map to bind action listeners
     const onPopupOpen = (e: { popup: { getElement: () => HTMLElement | null } }) => {
@@ -582,295 +620,291 @@ export default function Home() {
 
     const activeMarkers: { [key: string]: LeafletMarker } = {};
 
-    import("leaflet").then((LModule) => {
-      const L = LModule.default;
+    // Draw all other vehicles with low opacity if in history mode, or normal if not
+    vehicles.forEach((v) => {
+      if (historyVehicleId && v.id === historyVehicleId) return; // Managed separately below
 
-      // Draw all other vehicles with low opacity if in history mode, or normal if not
-      vehicles.forEach((v) => {
-        if (historyVehicleId && v.id === historyVehicleId) return; // Managed separately below
+      const isSelected = v.id === selectedVehicleId;
+      const latlng: [number, number] = [v.lat, v.lng];
+      const isLocked = lockedVehiclesRef.current.includes(v.id);
+      const opacityClass = historyVehicleId ? "opacity-25" : "";
 
-        const isSelected = v.id === selectedVehicleId;
-        const latlng: [number, number] = [v.lat, v.lng];
-        const isLocked = lockedVehiclesRef.current.includes(v.id);
-        const opacityClass = historyVehicleId ? "opacity-25" : "";
+      // Create Custom HTML Pin Marker
+      const iconHtml = `
+        <div class="relative flex flex-col items-center ${opacityClass}">
+          <!-- Name tag on hover or selection -->
+          <div class="absolute bottom-full mb-2 bg-white/95 px-2 py-0.5 rounded-full shadow-lg border border-primary/20 pointer-events-none whitespace-nowrap opacity-0 transition-opacity duration-200 ${
+            isSelected && !historyVehicleId ? "opacity-100 scale-100" : ""
+          } group-hover:opacity-100" style="transform: translateY(-2px)">
+            <p class="text-[9px] text-[#4f46e5] font-bold">#${v.id.split(" ")[1]} • ${v.name}</p>
+          </div>
+          
+          <!-- Map Pin Circle -->
+          <div class="w-9 h-9 rounded-full bg-white border-[3.5px] shadow-xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
+            isSelected && !historyVehicleId
+              ? "border-[#4f46e5] scale-110 ring-4 ring-[#4f46e5]/25"
+              : v.status === "ACTIVE"
+              ? "border-emerald-500 animate-pulse"
+              : v.status === "IDLE"
+              ? "border-amber-500"
+              : "border-red-500"
+          }">
+            <img src="${v.image}" class="w-full h-full object-cover" style="object-fit: cover;" alt="" />
+          </div>
+        </div>
+      `;
 
-        // Create Custom HTML Pin Marker
-        const iconHtml = `
-          <div class="relative flex flex-col items-center ${opacityClass}">
-            <!-- Name tag on hover or selection -->
-            <div class="absolute bottom-full mb-2 bg-white/95 px-2 py-0.5 rounded-full shadow-lg border border-primary/20 pointer-events-none whitespace-nowrap opacity-0 transition-opacity duration-200 ${
-              isSelected && !historyVehicleId ? "opacity-100 scale-100" : ""
-            } group-hover:opacity-100" style="transform: translateY(-2px)">
-              <p class="text-[9px] text-[#4f46e5] font-bold">#${v.id.split(" ")[1]} • ${v.name}</p>
+      const customIcon = L.divIcon({
+        html: iconHtml,
+        className: "group custom-marker-pin",
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+      });
+
+      const marker = L.marker(latlng, { icon: customIcon }).addTo(map);
+
+      if (!historyVehicleId) {
+        const popupHtml = `
+          <div class="p-3 font-outfit text-slate-800 min-w-[240px]">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+              <span class="font-bold text-[12px] text-slate-800">${v.id} | ${v.name}</span>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                v.status === "ACTIVE"
+                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                  : v.status === "IDLE"
+                  ? "bg-amber-50 text-amber-600 border border-amber-100"
+                  : "bg-rose-50 text-rose-600 border border-rose-100"
+              }">
+                ${v.status === "ACTIVE" ? "LIVE" : v.status}
+              </span>
             </div>
             
-            <!-- Map Pin Circle -->
-            <div class="w-9 h-9 rounded-full bg-white border-[3.5px] shadow-xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
-              isSelected && !historyVehicleId
-                ? "border-[#4f46e5] scale-110 ring-4 ring-[#4f46e5]/25"
-                : v.status === "ACTIVE"
-                ? "border-emerald-500 animate-pulse"
-                : v.status === "IDLE"
-                ? "border-amber-500"
-                : "border-red-500"
-            }">
-              <img src="${v.image}" class="w-full h-full object-cover" style="object-fit: cover;" alt="" />
+            <div class="space-y-2 text-[11px] text-slate-600 mb-3">
+              <div class="flex items-start gap-1">
+                <span class="material-symbols-outlined text-[13px] text-slate-400 mt-0.5">location_on</span>
+                <span class="flex-1">${v.location}</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
+                <span>Duration: <strong>${v.tripMetrics.duration}</strong></span>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-2 flex flex-col gap-1.5">
+              <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Actions</div>
+              <div class="grid grid-cols-3 gap-1">
+                <button id="pop-geofence-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-650 hover:text-primary cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px] mb-0.5">pentagon</span>
+                  <span class="text-[9px] font-medium font-sans">Geofence</span>
+                </button>
+                <button id="pop-poi-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px] mb-0.5">pin_drop</span>
+                  <span class="text-[9px] font-medium font-sans">POI</span>
+                </button>
+                <button id="pop-lock-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                  isLocked 
+                    ? "border-red-200 bg-red-50/50 text-red-600" 
+                    : "border-slate-100 hover:bg-slate-50 text-slate-600"
+                }">
+                  <span class="material-symbols-outlined text-[16px] mb-0.5" id="pop-lock-icon-${v.id}">${isLocked ? 'lock' : 'lock_open'}</span>
+                  <span class="text-[9px] font-medium font-sans" id="pop-lock-text-${v.id}">${isLocked ? 'Unlock' : 'Lock'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        marker.bindPopup(popupHtml, {
+          className: "custom-leaflet-popup",
+          maxWidth: 285,
+          minWidth: 245,
+          offset: [0, -12]
+        }).on("click", () => {
+          setSelectedVehicleId(v.id);
+        });
+      }
+
+      activeMarkers[v.id] = marker;
+    });
+
+    // History Mode specific drawing
+    if (historyVehicleId) {
+      const active = vehicles.find((v) => v.id === historyVehicleId);
+      if (active) {
+        const path = getVehiclePath(historyVehicleId, vehicles, historyStartDate, historyEndDate);
+        const currentPoint = path[historyPlaybackIndex] || path[0];
+
+        // 1. Draw the complete historical path (Polyline)
+        const historyPolyline = L.polyline(path, {
+          color: "#6366f1",
+          weight: 5,
+          opacity: 0.75,
+          lineCap: "round",
+          lineJoin: "round"
+        }).addTo(map);
+        routePolylinesRef.current.push(historyPolyline);
+
+        // 2. Draw Start Marker
+        const startMarker = L.marker(path[0], {
+          icon: L.divIcon({
+            html: `
+              <div class="relative flex flex-col items-center group">
+                <div class="absolute bottom-full mb-1 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
+                  Start Point
+                </div>
+                <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-slate-950 shadow-md"></div>
+              </div>
+            `,
+            className: "custom-route-start",
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          })
+        }).addTo(map);
+
+        // 3. Draw End Marker
+        const endMarker = L.marker(path[path.length - 1], {
+          icon: L.divIcon({
+            html: `
+              <div class="relative flex flex-col items-center group">
+                <div class="absolute bottom-full mb-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
+                  End Point
+                </div>
+                <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-md"></div>
+              </div>
+            `,
+            className: "custom-route-end",
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          })
+        }).addTo(map);
+
+        routeMarkersRef.current.push(startMarker, endMarker);
+
+        // 4. Draw Playback Vehicle Marker
+        const historyIconHtml = `
+          <div class="relative flex flex-col items-center">
+            <div class="absolute bottom-full mb-2 bg-[#4f46e5] text-white px-2 py-0.5 rounded-full shadow-lg border border-primary/20 pointer-events-none whitespace-nowrap">
+              <p class="text-[9px] font-bold">#${active.id.split(" ")[1]} • Playback</p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-[#4f46e5]/25">
+              <img src="${active.image}" class="w-full h-full object-cover" style="object-fit: cover;" alt="" />
             </div>
           </div>
         `;
 
-        const customIcon = L.divIcon({
-          html: iconHtml,
-          className: "group custom-marker-pin",
-          iconSize: [36, 36],
-          iconAnchor: [18, 18],
-        });
+        const historyPlaybackMarker = L.marker(currentPoint, {
+          icon: L.divIcon({
+            html: historyIconHtml,
+            className: "group custom-marker-pin",
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+          })
+        }).addTo(map);
 
-        const marker = L.marker(latlng, { icon: customIcon }).addTo(map);
+        activeMarkers[historyVehicleId] = historyPlaybackMarker;
 
-        if (!historyVehicleId) {
-          const popupHtml = `
-            <div class="p-3 font-outfit text-slate-800 min-w-[240px]">
-              <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                <span class="font-bold text-[12px] text-slate-800">${v.id} | ${v.name}</span>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                  v.status === "ACTIVE"
-                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    : v.status === "IDLE"
-                    ? "bg-amber-50 text-amber-600 border border-amber-100"
-                    : "bg-rose-50 text-rose-600 border border-rose-100"
-                }">
-                  ${v.status === "ACTIVE" ? "LIVE" : v.status}
-                </span>
-              </div>
-              
-              <div class="space-y-2 text-[11px] text-slate-600 mb-3">
-                <div class="flex items-start gap-1">
-                  <span class="material-symbols-outlined text-[13px] text-slate-400 mt-0.5">location_on</span>
-                  <span class="flex-1">${v.location}</span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <span class="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
-                  <span>Duration: <strong>${v.tripMetrics.duration}</strong></span>
-                </div>
-              </div>
-
-              <div class="border-t border-slate-100 pt-2 flex flex-col gap-1.5">
-                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Actions</div>
-                <div class="grid grid-cols-3 gap-1">
-                  <button id="pop-geofence-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
-                    <span class="material-symbols-outlined text-[16px] mb-0.5">pentagon</span>
-                    <span class="text-[9px] font-medium font-sans">Geofence</span>
-                  </button>
-                  <button id="pop-poi-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
-                    <span class="material-symbols-outlined text-[16px] mb-0.5">pin_drop</span>
-                    <span class="text-[9px] font-medium font-sans">POI</span>
-                  </button>
-                  <button id="pop-lock-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                    isLocked 
-                      ? "border-red-200 bg-red-50/50 text-red-600" 
-                      : "border-slate-100 hover:bg-slate-50 text-slate-600"
-                  }">
-                    <span class="material-symbols-outlined text-[16px] mb-0.5" id="pop-lock-icon-${v.id}">${isLocked ? 'lock' : 'lock_open'}</span>
-                    <span class="text-[9px] font-medium font-sans" id="pop-lock-text-${v.id}">${isLocked ? 'Unlock' : 'Lock'}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          `;
-          
-          marker.bindPopup(popupHtml, {
-            className: "custom-leaflet-popup",
-            maxWidth: 285,
-            minWidth: 245,
-            offset: [0, -12]
-          }).on("click", () => {
-            setSelectedVehicleId(v.id);
-          });
-        }
-
-        activeMarkers[v.id] = marker;
-      });
-
-      // History Mode specific drawing
-      if (historyVehicleId) {
-        const active = vehicles.find((v) => v.id === historyVehicleId);
-        if (active) {
-          const path = getVehiclePath(historyVehicleId, vehicles);
-          const currentPoint = path[historyPlaybackIndex] || path[0];
-
-          // 1. Draw the complete historical path (Polyline)
-          const historyPolyline = L.polyline(path, {
-            color: "#6366f1",
-            weight: 5,
-            opacity: 0.75,
-            lineCap: "round",
-            lineJoin: "round"
-          }).addTo(map);
-          routePolylinesRef.current.push(historyPolyline);
-
-          // 2. Draw Start Marker
-          const startMarker = L.marker(path[0], {
-            icon: L.divIcon({
-              html: `
-                <div class="relative flex flex-col items-center group">
-                  <div class="absolute bottom-full mb-1 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
-                    Start Point
-                  </div>
-                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-slate-950 shadow-md"></div>
-                </div>
-              `,
-              className: "custom-route-start",
-              iconSize: [14, 14],
-              iconAnchor: [7, 7],
-            })
-          }).addTo(map);
-
-          // 3. Draw End Marker
-          const endMarker = L.marker(path[path.length - 1], {
-            icon: L.divIcon({
-              html: `
-                <div class="relative flex flex-col items-center group">
-                  <div class="absolute bottom-full mb-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
-                    End Point
-                  </div>
-                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-md"></div>
-                </div>
-              `,
-              className: "custom-route-end",
-              iconSize: [14, 14],
-              iconAnchor: [7, 7],
-            })
-          }).addTo(map);
-
-          routeMarkersRef.current.push(startMarker, endMarker);
-
-          // 4. Draw Playback Vehicle Marker
-          const historyIconHtml = `
-            <div class="relative flex flex-col items-center">
-              <div class="absolute bottom-full mb-2 bg-[#4f46e5] text-white px-2 py-0.5 rounded-full shadow-lg border border-primary/20 pointer-events-none whitespace-nowrap">
-                <p class="text-[9px] font-bold">#${active.id.split(" ")[1]} • Playback</p>
-              </div>
-              <div class="w-10 h-10 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-[#4f46e5]/25">
-                <img src="${active.image}" class="w-full h-full object-cover" style="object-fit: cover;" alt="" />
-              </div>
-            </div>
-          `;
-
-          const historyPlaybackMarker = L.marker(currentPoint, {
-            icon: L.divIcon({
-              html: historyIconHtml,
-              className: "group custom-marker-pin",
-              iconSize: [40, 40],
-              iconAnchor: [20, 20],
-            })
-          }).addTo(map);
-
-          activeMarkers[historyVehicleId] = historyPlaybackMarker;
-
-          // Pan to current playback point
-          map.panTo(currentPoint);
-        }
+        // Pan to current playback point
+        map.panTo(currentPoint);
       }
-      // Normal Route details drawing
-      else if (selectedVehicleId && ROUTE_DETAILS[selectedVehicleId]) {
-        const details = ROUTE_DETAILS[selectedVehicleId];
-        const active = vehicles.find((v) => v.id === selectedVehicleId);
-        if (active) {
-          const currentLoc: [number, number] = [active.lat, active.lng];
-          const closestIndex = findClosestPointIndex(details.path, currentLoc);
-          
-          const completedPath = [...details.path.slice(0, closestIndex + 1), currentLoc];
-          const remainingPath = [currentLoc, ...details.path.slice(closestIndex + 1)];
+    }
+    // Normal Route details drawing
+    else if (selectedVehicleId && ROUTE_DETAILS[selectedVehicleId]) {
+      const details = ROUTE_DETAILS[selectedVehicleId];
+      const active = vehicles.find((v) => v.id === selectedVehicleId);
+      if (active) {
+        const currentLoc: [number, number] = [active.lat, active.lng];
+        const closestIndex = findClosestPointIndex(details.path, currentLoc);
+        
+        const completedPath = [...details.path.slice(0, closestIndex + 1), currentLoc];
+        const remainingPath = [currentLoc, ...details.path.slice(closestIndex + 1)];
 
-          const completedPolyline = L.polyline(completedPath, {
-            color: "#4f46e5",
-            weight: 4,
-            opacity: 0.8,
-            lineCap: "round",
-            lineJoin: "round"
-          }).addTo(map);
+        const completedPolyline = L.polyline(completedPath, {
+          color: "#4f46e5",
+          weight: 4,
+          opacity: 0.8,
+          lineCap: "round",
+          lineJoin: "round"
+        }).addTo(map);
 
-          const remainingPolyline = L.polyline(remainingPath, {
-            color: "#94a3b8",
-            weight: 3,
-            opacity: 0.6,
-            dashArray: "6, 6",
-            lineCap: "round",
-            lineJoin: "round"
-          }).addTo(map);
+        const remainingPolyline = L.polyline(remainingPath, {
+          color: "#94a3b8",
+          weight: 3,
+          opacity: 0.6,
+          dashArray: "6, 6",
+          lineCap: "round",
+          lineJoin: "round"
+        }).addTo(map);
 
-          routePolylinesRef.current.push(completedPolyline, remainingPolyline);
+        routePolylinesRef.current.push(completedPolyline, remainingPolyline);
 
-          // Add Start Marker
-          const startMarker = L.marker(details.originLatlng, {
-            icon: L.divIcon({
-              html: `
-                <div class="relative flex flex-col items-center group">
-                  <div class="absolute bottom-full mb-1 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
-                    Origin: ${details.origin}
-                  </div>
-                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-slate-950 shadow-md"></div>
+        // Add Start Marker
+        const startMarker = L.marker(details.originLatlng, {
+          icon: L.divIcon({
+            html: `
+              <div class="relative flex flex-col items-center group">
+                <div class="absolute bottom-full mb-1 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
+                  Origin: ${details.origin}
                 </div>
-              `,
-              className: "custom-route-start",
-              iconSize: [12, 12],
-              iconAnchor: [6, 6],
-            })
-          }).addTo(map);
+                <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-slate-950 shadow-md"></div>
+              </div>
+            `,
+            className: "custom-route-start",
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+          })
+        }).addTo(map);
 
-          // Add End Marker
-          const endMarker = L.marker(details.destLatlng, {
-            icon: L.divIcon({
-              html: `
-                <div class="relative flex flex-col items-center group">
-                  <div class="absolute bottom-full mb-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
-                    Dest: ${details.destination}
-                  </div>
-                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-md"></div>
+        // Add End Marker
+        const endMarker = L.marker(details.destLatlng, {
+          icon: L.divIcon({
+            html: `
+              <div class="relative flex flex-col items-center group">
+                <div class="absolute bottom-full mb-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
+                  Dest: ${details.destination}
                 </div>
-              `,
-              className: "custom-route-end",
-              iconSize: [12, 12],
-              iconAnchor: [6, 6],
-            })
-          }).addTo(map);
+                <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-md"></div>
+              </div>
+            `,
+            className: "custom-route-end",
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+          })
+        }).addTo(map);
 
-          routeMarkersRef.current.push(startMarker, endMarker);
+        routeMarkersRef.current.push(startMarker, endMarker);
+      }
+    }
+
+    // Track markers ref for updates
+    markersRef.current = activeMarkers;
+
+    // If a vehicle is selected, open its popup automatically (only if NOT in history mode)
+    if (selectedVehicleId && activeMarkers[selectedVehicleId] && !historyVehicleId) {
+      setTimeout(() => {
+        if (activeMarkers[selectedVehicleId]) {
+          activeMarkers[selectedVehicleId].openPopup();
         }
+      }, 120);
+    }
+
+    // Handle pan / zoom transitions on selected ID change (only if NOT in history mode)
+    const selectionChanged = selectedVehicleId !== prevSelectedIdRef.current;
+    prevSelectedIdRef.current = selectedVehicleId;
+
+    if (selectedVehicleId && selectionChanged && !historyVehicleId) {
+      const active = vehicles.find((v) => v.id === selectedVehicleId);
+      const details = ROUTE_DETAILS[selectedVehicleId];
+      if (active && details) {
+        const bounds = L.latLngBounds([
+          details.originLatlng,
+          [active.lat, active.lng],
+          details.destLatlng
+        ]);
+        map.fitBounds(bounds, { padding: [80, 80] });
+      } else if (active) {
+        map.setView([active.lat, active.lng], 13);
       }
-
-      // Track markers ref for updates
-      markersRef.current = activeMarkers;
-
-      // If a vehicle is selected, open its popup automatically (only if NOT in history mode)
-      if (selectedVehicleId && activeMarkers[selectedVehicleId] && !historyVehicleId) {
-        setTimeout(() => {
-          if (activeMarkers[selectedVehicleId]) {
-            activeMarkers[selectedVehicleId].openPopup();
-          }
-        }, 120);
-      }
-
-      // Handle pan / zoom transitions on selected ID change (only if NOT in history mode)
-      const selectionChanged = selectedVehicleId !== prevSelectedIdRef.current;
-      prevSelectedIdRef.current = selectedVehicleId;
-
-      if (selectedVehicleId && selectionChanged && !historyVehicleId) {
-        const active = vehicles.find((v) => v.id === selectedVehicleId);
-        const details = ROUTE_DETAILS[selectedVehicleId];
-        if (active && details) {
-          const bounds = L.latLngBounds([
-            details.originLatlng,
-            [active.lat, active.lng],
-            details.destLatlng
-          ]);
-          map.fitBounds(bounds, { padding: [80, 80] });
-        } else if (active) {
-          map.setView([active.lat, active.lng], 13);
-        }
-      }
-    });
+    }
 
     return () => {
       map.off("popupopen", onPopupOpen);
@@ -891,7 +925,7 @@ export default function Home() {
       });
       routeMarkersRef.current = [];
     };
-  }, [map, vehicles, selectedVehicleId, historyVehicleId, historyPlaybackIndex]);
+  }, [map, L, vehicles, selectedVehicleId, historyVehicleId, historyPlaybackIndex, historyStartDate, historyEndDate]);
 
   // Zoom Button interactions
   const handleZoomIn = () => {
@@ -1184,17 +1218,24 @@ export default function Home() {
                     {/* Playback Progress */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-[9px] font-mono text-slate-400">
-                        <span>Playback Progress</span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block"></span>
+                          Time: <strong className="text-slate-650 dark:text-slate-200">{getPlaybackTime(historyPlaybackIndex, getVehiclePath(historyVehicleId, vehicles, historyStartDate, historyEndDate).length, historyStartDate, historyEndDate)}</strong>
+                        </span>
                         <span>
-                          {Math.round((historyPlaybackIndex / (getVehiclePath(historyVehicleId, vehicles).length - 1)) * 100) || 0}%
+                          {Math.round((historyPlaybackIndex / (getVehiclePath(historyVehicleId, vehicles, historyStartDate, historyEndDate).length - 1)) * 100) || 0}%
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary transition-all duration-350"
-                          style={{
-                            width: `${(historyPlaybackIndex / (getVehiclePath(historyVehicleId, vehicles).length - 1)) * 100}%`
+                      <div className="relative flex items-center">
+                        <input
+                          type="range"
+                          min="0"
+                          max={getVehiclePath(historyVehicleId, vehicles, historyStartDate, historyEndDate).length - 1}
+                          value={historyPlaybackIndex}
+                          onChange={(e) => {
+                            setHistoryPlaybackIndex(parseInt(e.target.value, 10));
                           }}
+                          className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                     </div>
@@ -1203,13 +1244,13 @@ export default function Home() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          const path = getVehiclePath(historyVehicleId, vehicles);
+                          const path = getVehiclePath(historyVehicleId, vehicles, historyStartDate, historyEndDate);
                           if (historyPlaybackIndex >= path.length - 1) {
                             setHistoryPlaybackIndex(0);
                           }
                           setIsPlayingHistory(!isPlayingHistory);
                         }}
-                        className="flex-1 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-md shadow-primary/10 transition-colors"
+                        className="flex-1 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-md shadow-primary/10 transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[16px]">
                           {isPlayingHistory ? "pause" : "play_arrow"}
@@ -1466,14 +1507,17 @@ export default function Home() {
                                       </span>
                                       
                                       {activeMenuVehicleId === vehicle.id && (
-                                        <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui more-actions-dropdown">
+                                        <div 
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui more-actions-dropdown"
+                                        >
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               setActiveMenuVehicleId(null);
-                                              alert(`Viewing Profile: Driver - ${vehicle.driverName}, Role - ${vehicle.driverRole}, Vehicle ID - ${vehicle.id}`);
+                                              setProfileModalVehicleId(vehicle.id);
                                             }}
-                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                           >
                                             View Profile
                                           </button>
@@ -1485,7 +1529,7 @@ export default function Home() {
                                               setHistoryPlaybackIndex(0);
                                               setIsPlayingHistory(false);
                                             }}
-                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                           >
                                             History
                                           </button>
@@ -1493,9 +1537,9 @@ export default function Home() {
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               setActiveMenuVehicleId(null);
-                                              alert(`Operational Report generated for vehicle ${vehicle.id}`);
+                                              setReportModalVehicleId(vehicle.id);
                                             }}
-                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                           >
                                             Report
                                           </button>
@@ -1625,14 +1669,17 @@ export default function Home() {
                         </button>
                         
                         {isDetailMenuOpen && (
-                          <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui more-actions-dropdown">
+                          <div 
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui more-actions-dropdown"
+                          >
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setIsDetailMenuOpen(false);
-                                alert(`Viewing Profile: Driver - ${selectedVehicle.driverName}, Role - ${selectedVehicle.driverRole}, Vehicle ID - ${selectedVehicle.id}`);
+                                setProfileModalVehicleId(selectedVehicle.id);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             >
                               View Profile
                             </button>
@@ -1644,7 +1691,7 @@ export default function Home() {
                                 setHistoryPlaybackIndex(0);
                                 setIsPlayingHistory(false);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             >
                               History
                             </button>
@@ -1652,9 +1699,9 @@ export default function Home() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setIsDetailMenuOpen(false);
-                                alert(`Operational Report generated for vehicle ${selectedVehicle.id}`);
+                                setReportModalVehicleId(selectedVehicle.id);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             >
                               Report
                             </button>
@@ -2040,7 +2087,220 @@ export default function Home() {
         </div>
         <span className="uppercase tracking-widest text-[8.5px]">© 2026 TOUCHTRACK OPERATIONS CENTER</span>
       </footer>
-      
+
+      {/* Driver Profile Modal */}
+      {profileModalVehicleId && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setProfileModalVehicleId(null)}>
+          <div className="bg-white/95 dark:bg-slate-905/95 border border-slate-200/50 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative overflow-hidden transition-all duration-300 transform scale-100" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-[10px] font-bold text-slate-450 dark:text-slate-550 uppercase tracking-wider">Driver Profile</h3>
+                <h2 className="text-base font-black text-slate-805 dark:text-slate-100">{vehicles.find(v => v.id === profileModalVehicleId)?.driverName}</h2>
+              </div>
+              <button 
+                onClick={() => setProfileModalVehicleId(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="space-y-4">
+              <div className="flex gap-4 items-center p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100/50 dark:border-slate-800/20">
+                <div className="w-14 h-14 rounded-xl bg-slate-200 overflow-hidden relative shrink-0 border border-slate-200 dark:border-slate-700">
+                  <img src={vehicles.find(v => v.id === profileModalVehicleId)?.image} className="w-full h-full object-cover" alt="" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase">{vehicles.find(v => v.id === profileModalVehicleId)?.driverRole || "Senior Logistics Specialist"}</p>
+                  <p className="text-[9px] text-slate-500 font-mono mt-0.5">ID: {profileModalVehicleId}</p>
+                  <div className="flex items-center gap-1 mt-1 text-amber-500">
+                    <span className="material-symbols-outlined text-[13px]">star</span>
+                    <span className="text-[10px] font-black font-mono">4.9 / 5.0 Rating</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100/50 dark:border-slate-800/20">
+                  <span className="text-slate-400 block mb-0.5">License Class</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">Heavy Rigid (HR)</span>
+                </div>
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100/50 dark:border-slate-800/20">
+                  <span className="text-slate-400 block mb-0.5">Safety Score</span>
+                  <span className="font-bold text-emerald-500 font-mono">98% (Excellent)</span>
+                </div>
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100/50 dark:border-slate-800/20">
+                  <span className="text-slate-400 block mb-0.5">Phone Contact</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">+971 50 123 4567</span>
+                </div>
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100/50 dark:border-slate-800/20">
+                  <span className="text-slate-400 block mb-0.5">Duty Duration</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">06h 42m Active</span>
+                </div>
+              </div>
+
+              {/* Status / History logs preview */}
+              <div className="space-y-1.5">
+                <h4 className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Safety Events Log</h4>
+                <div className="text-[9px] space-y-1 font-mono">
+                  <div className="flex justify-between py-0.5 border-b border-slate-100 dark:border-slate-800/50">
+                    <span className="text-slate-500">Speeding Limit Check</span>
+                    <span className="text-emerald-500 font-bold">Passed</span>
+                  </div>
+                  <div className="flex justify-between py-0.5 border-b border-slate-100 dark:border-slate-800/50">
+                    <span className="text-slate-500">Fatigue Sensor Assessment</span>
+                    <span className="text-emerald-500 font-bold">Optimal</span>
+                  </div>
+                  <div className="flex justify-between py-0.5 border-b border-slate-100 dark:border-slate-800/50">
+                    <span className="text-slate-500">Rapid Acceleration Warnings</span>
+                    <span className="text-slate-700 dark:text-slate-300">0 events</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-5">
+              <button 
+                onClick={() => alert(`Dialing contact number for driver...`)}
+                className="flex-1 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">call</span>
+                Voice Call
+              </button>
+              <button 
+                onClick={() => {
+                  setProfileModalVehicleId(null);
+                  setHistoryVehicleId(profileModalVehicleId);
+                  setHistoryPlaybackIndex(0);
+                  setIsPlayingHistory(false);
+                }}
+                className="flex-1 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-primary/10 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">route</span>
+                Route History
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Operational Report Modal */}
+      {reportModalVehicleId && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setReportModalVehicleId(null)}>
+          <div className="bg-white/95 dark:bg-slate-905/95 border border-slate-200/50 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl p-6 relative overflow-hidden transition-all duration-300 transform scale-100" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-[10px] font-bold text-slate-450 dark:text-slate-555 uppercase tracking-wider">Fleet Diagnostics</h3>
+                <h2 className="text-base font-black text-slate-800 dark:text-slate-100">Operational Report: {reportModalVehicleId}</h2>
+              </div>
+              <button 
+                onClick={() => setReportModalVehicleId(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="space-y-4">
+              {/* Trip details grid */}
+              <div className="grid grid-cols-3 gap-2.5 text-center text-[9px]">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100/50 dark:border-slate-800/30">
+                  <span className="text-slate-450 dark:text-slate-400 block mb-0.5 uppercase tracking-tighter">Avg Fuel Economy</span>
+                  <span className="font-bold text-[11px] text-slate-800 dark:text-slate-205">28.4 L/100km</span>
+                </div>
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100/50 dark:border-slate-800/30">
+                  <span className="text-slate-450 dark:text-slate-400 block mb-0.5 uppercase tracking-tighter">Total Trip Mileage</span>
+                  <span className="font-bold text-[11px] text-slate-800 dark:text-slate-205">242.8 km</span>
+                </div>
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100/50 dark:border-slate-800/30">
+                  <span className="text-slate-450 dark:text-slate-400 block mb-0.5 uppercase tracking-tighter">Diagnostic Alarms</span>
+                  <span className="font-bold text-[11px] text-emerald-500">0 Active</span>
+                </div>
+              </div>
+
+              {/* Path / Location info */}
+              <div className="bg-slate-50 dark:bg-slate-850/30 rounded-2xl p-3 border border-slate-100/50 dark:border-slate-800/50 text-[10px] space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-medium">Assigned Driver:</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-350">{vehicles.find(v => v.id === reportModalVehicleId)?.driverName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-medium">Active Trip Route:</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-350">
+                    {ROUTE_DETAILS[reportModalVehicleId]?.origin || "Start"} → {ROUTE_DETAILS[reportModalVehicleId]?.destination || "Destination"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-medium">Odometer Reading:</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-350 font-mono">{vehicles.find(v => v.id === reportModalVehicleId)?.odometer}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-medium">Current Status Code:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-450 uppercase flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    {vehicles.find(v => v.id === reportModalVehicleId)?.status} (LIVE)
+                  </span>
+                </div>
+              </div>
+
+              {/* Event Log Table */}
+              <div className="space-y-1.5">
+                <h4 className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Recent Diagnostic Events</h4>
+                <div className="max-h-24 overflow-y-auto border border-slate-150 dark:border-slate-800 rounded-xl no-scrollbar">
+                  <table className="w-full text-left text-[8.5px] font-mono border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/70 text-slate-500 border-b border-slate-150 dark:border-slate-800">
+                        <th className="p-2 font-bold">Time</th>
+                        <th className="p-2 font-bold">Event Description</th>
+                        <th className="p-2 font-bold text-right">System Metric</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      <tr>
+                        <td className="p-2 text-slate-400">10:42 AM</td>
+                        <td className="p-2 text-slate-700 dark:text-slate-300">Engine Temp stabilized</td>
+                        <td className="p-2 text-right text-emerald-500 font-bold">89°C (Normal)</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 text-slate-400">09:15 AM</td>
+                        <td className="p-2 text-slate-700 dark:text-slate-300">Tire pressure sync complete</td>
+                        <td className="p-2 text-right text-slate-700 dark:text-slate-300">36.2 PSI</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 text-slate-400">08:00 AM</td>
+                        <td className="p-2 text-slate-700 dark:text-slate-300">Fleet telemetry initialized</td>
+                        <td className="p-2 text-right text-emerald-500 font-bold">Active</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button 
+                onClick={() => alert(`Sharing operational report of ${reportModalVehicleId} to dispatcher team email.`)}
+                className="flex-1 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">share</span>
+                Dispatch Share
+              </button>
+              <button 
+                onClick={() => window.print()}
+                className="flex-1 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-primary/10 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">download</span>
+                Export PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
