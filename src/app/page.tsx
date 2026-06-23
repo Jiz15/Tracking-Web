@@ -287,6 +287,7 @@ export default function Home() {
     address: true,
     odometer: true,
     temperature: false,
+    driver: true,
   });
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
 
@@ -1090,6 +1091,15 @@ export default function Home() {
                                   />
                                   <span className="text-[11px] text-slate-600">Cargo Temp</span>
                                 </label>
+                                <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50/50 p-1 rounded transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={displayFields.driver}
+                                    onChange={(e) => setDisplayFields({ ...displayFields, driver: e.target.checked })}
+                                    className="w-3 h-3 rounded border-slate-300 text-primary focus:ring-primary/20 bg-transparent"
+                                  />
+                                  <span className="text-[11px] text-slate-600">Driver</span>
+                                </label>
                               </div>
                             </div>
                           )}
@@ -1171,18 +1181,22 @@ export default function Home() {
                                         <span className="text-[10px] truncate">{vehicle.location}</span>
                                       </div>
                                     )}
-                                    <div className="flex items-center gap-3 text-slate-500">
-                                      {displayFields.odometer && (
-                                        <div className="flex items-center gap-1">
-                                          <span className="material-symbols-outlined text-[12px] shrink-0">speed</span>
-                                          <span className="text-[10px]">{vehicle.odometer}</span>
-                                        </div>
-                                      )}
-                                      <div className="flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[12px] shrink-0">person</span>
-                                        <span className="text-[10px] truncate">{vehicle.driverName}</span>
+                                    {(displayFields.odometer || displayFields.driver) && (
+                                      <div className="flex items-center gap-3 text-slate-500">
+                                        {displayFields.odometer && (
+                                          <div className="flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[12px] shrink-0">speed</span>
+                                            <span className="text-[10px]">{vehicle.odometer}</span>
+                                          </div>
+                                        )}
+                                        {displayFields.driver && (
+                                          <div className="flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[12px] shrink-0">person</span>
+                                            <span className="text-[10px] truncate">{vehicle.driverName}</span>
+                                          </div>
+                                        )}
                                       </div>
-                                    </div>
+                                    )}
                                     {displayFields.temperature && (
                                       <div className="flex items-center gap-1 text-slate-500">
                                         <span className="material-symbols-outlined text-[12px] shrink-0">thermostat</span>
