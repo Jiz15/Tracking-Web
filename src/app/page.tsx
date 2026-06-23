@@ -251,6 +251,25 @@ function findClosestPointIndex(path: [number, number][], current: [number, numbe
   return closestIndex;
 }
 
+// Helper to get historical path or generate mock path if not predefined
+function getVehiclePath(vId: string, vehiclesList: Vehicle[]): [number, number][] {
+  if (ROUTE_DETAILS[vId]) {
+    return ROUTE_DETAILS[vId].path;
+  }
+  const v = vehiclesList.find(x => x.id === vId);
+  const lat = v ? v.lat : 25.12;
+  const lng = v ? v.lng : 55.2;
+  return [
+    [lat - 0.05, lng - 0.05],
+    [lat - 0.03, lng - 0.02],
+    [lat - 0.015, lng - 0.01],
+    [lat, lng],
+    [lat + 0.015, lng + 0.01],
+    [lat + 0.035, lng + 0.02],
+    [lat + 0.05, lng + 0.05]
+  ];
+}
+
 export default function Home() {
   // Main states
   const [vehicles, setVehicles] = useState<Vehicle[]>(INITIAL_VEHICLES);
@@ -259,6 +278,13 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "IDLE" | "STOP">("ALL");
   const [isListShrunk, setIsListShrunk] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [activeMenuVehicleId, setActiveMenuVehicleId] = useState<string | null>(null);
+  const [isDetailMenuOpen, setIsDetailMenuOpen] = useState(false);
+  const [historyVehicleId, setHistoryVehicleId] = useState<string | null>(null);
+  const [isPlayingHistory, setIsPlayingHistory] = useState(false);
+  const [historyPlaybackIndex, setHistoryPlaybackIndex] = useState(0);
+  const [historyStartDate, setHistoryStartDate] = useState("2026-06-22T08:00");
+  const [historyEndDate, setHistoryEndDate] = useState("2026-06-22T18:00");
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
@@ -281,6 +307,38 @@ export default function Home() {
       document.documentElement.classList.remove("dark");
     }
   }, [theme]);
+
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleDocumentClick = () => {
+      setActiveMenuVehicleId(null);
+      setIsDetailMenuOpen(false);
+    };
+    document.addEventListener("click", handleDocumentClick);
+    return () => {
+      document.removeEventListener("click", handleDocumentClick);
+    };
+  }, []);
+
+  // History playback animation effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isPlayingHistory && historyVehicleId) {
+      const path = getVehiclePath(historyVehicleId, vehicles);
+      interval = setInterval(() => {
+        setHistoryPlaybackIndex((prev) => {
+          if (prev >= path.length - 1) {
+            setIsPlayingHistory(false);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 1000); // 1 step per second
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlayingHistory, historyVehicleId, vehicles]);
 
   // Customize floating panel checkboxes
   const [displayFields, setDisplayFields] = useState({
@@ -523,24 +581,28 @@ export default function Home() {
     import("leaflet").then((LModule) => {
       const L = LModule.default;
 
+      // Draw all other vehicles with low opacity if in history mode, or normal if not
       vehicles.forEach((v) => {
+        if (historyVehicleId && v.id === historyVehicleId) return; // Managed separately below
+
         const isSelected = v.id === selectedVehicleId;
         const latlng: [number, number] = [v.lat, v.lng];
         const isLocked = lockedVehiclesRef.current.includes(v.id);
+        const opacityClass = historyVehicleId ? "opacity-25" : "";
 
         // Create Custom HTML Pin Marker
         const iconHtml = `
-          <div class="relative flex flex-col items-center">
+          <div class="relative flex flex-col items-center ${opacityClass}">
             <!-- Name tag on hover or selection -->
             <div class="absolute bottom-full mb-2 bg-white/95 px-2 py-0.5 rounded-full shadow-lg border border-primary/20 pointer-events-none whitespace-nowrap opacity-0 transition-opacity duration-200 ${
-              isSelected ? "opacity-100 scale-100" : ""
+              isSelected && !historyVehicleId ? "opacity-100 scale-100" : ""
             } group-hover:opacity-100" style="transform: translateY(-2px)">
               <p class="text-[9px] text-[#4f46e5] font-bold">#${v.id.split(" ")[1]} • ${v.name}</p>
             </div>
             
             <!-- Map Pin Circle -->
             <div class="w-9 h-9 rounded-full bg-white border-[3.5px] shadow-xl flex items-center justify-center overflow-hidden transition-all duration-300 ${
-              isSelected
+              isSelected && !historyVehicleId
                 ? "border-[#4f46e5] scale-110 ring-4 ring-[#4f46e5]/25"
                 : v.status === "ACTIVE"
                 ? "border-emerald-500 animate-pulse"
@@ -553,56 +615,6 @@ export default function Home() {
           </div>
         `;
 
-        const popupHtml = `
-          <div class="p-3 font-outfit text-slate-800 min-w-[240px]">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-              <span class="font-bold text-[12px] text-slate-800">${v.id} | ${v.name}</span>
-              <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                v.status === "ACTIVE"
-                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                  : v.status === "IDLE"
-                  ? "bg-amber-50 text-amber-600 border border-amber-100"
-                  : "bg-rose-50 text-rose-600 border border-rose-100"
-              }">
-                ${v.status === "ACTIVE" ? "LIVE" : v.status}
-              </span>
-            </div>
-            
-            <div class="space-y-2 text-[11px] text-slate-600 mb-3">
-              <div class="flex items-start gap-1">
-                <span class="material-symbols-outlined text-[13px] text-slate-400 mt-0.5">location_on</span>
-                <span class="flex-1">${v.location}</span>
-              </div>
-              <div class="flex items-center gap-1">
-                <span class="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
-                <span>Duration: <strong>${v.tripMetrics.duration}</strong></span>
-              </div>
-            </div>
-
-            <div class="border-t border-slate-100 pt-2 flex flex-col gap-1.5">
-              <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Actions</div>
-              <div class="grid grid-cols-3 gap-1">
-                <button id="pop-geofence-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
-                  <span class="material-symbols-outlined text-[16px] mb-0.5">pentagon</span>
-                  <span class="text-[9px] font-medium font-sans">Geofence</span>
-                </button>
-                <button id="pop-poi-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
-                  <span class="material-symbols-outlined text-[16px] mb-0.5">pin_drop</span>
-                  <span class="text-[9px] font-medium font-sans">POI</span>
-                </button>
-                <button id="pop-lock-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                  isLocked 
-                    ? "border-red-200 bg-red-50/50 text-red-600" 
-                    : "border-slate-100 hover:bg-slate-50 text-slate-600"
-                }">
-                  <span class="material-symbols-outlined text-[16px] mb-0.5" id="pop-lock-icon-${v.id}">${isLocked ? 'lock' : 'lock_open'}</span>
-                  <span class="text-[9px] font-medium font-sans" id="pop-lock-text-${v.id}">${isLocked ? 'Unlock' : 'Lock'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-
         const customIcon = L.divIcon({
           html: iconHtml,
           className: "group custom-marker-pin",
@@ -610,23 +622,154 @@ export default function Home() {
           iconAnchor: [18, 18],
         });
 
-        const marker = L.marker(latlng, { icon: customIcon })
-          .addTo(map)
-          .bindPopup(popupHtml, {
+        const marker = L.marker(latlng, { icon: customIcon }).addTo(map);
+
+        if (!historyVehicleId) {
+          const popupHtml = `
+            <div class="p-3 font-outfit text-slate-800 min-w-[240px]">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                <span class="font-bold text-[12px] text-slate-800">${v.id} | ${v.name}</span>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                  v.status === "ACTIVE"
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    : v.status === "IDLE"
+                    ? "bg-amber-50 text-amber-600 border border-amber-100"
+                    : "bg-rose-50 text-rose-600 border border-rose-100"
+                }">
+                  ${v.status === "ACTIVE" ? "LIVE" : v.status}
+                </span>
+              </div>
+              
+              <div class="space-y-2 text-[11px] text-slate-600 mb-3">
+                <div class="flex items-start gap-1">
+                  <span class="material-symbols-outlined text-[13px] text-slate-400 mt-0.5">location_on</span>
+                  <span class="flex-1">${v.location}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
+                  <span>Duration: <strong>${v.tripMetrics.duration}</strong></span>
+                </div>
+              </div>
+
+              <div class="border-t border-slate-100 pt-2 flex flex-col gap-1.5">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Actions</div>
+                <div class="grid grid-cols-3 gap-1">
+                  <button id="pop-geofence-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] mb-0.5">pentagon</span>
+                    <span class="text-[9px] font-medium font-sans">Geofence</span>
+                  </button>
+                  <button id="pop-poi-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600 hover:text-primary cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] mb-0.5">pin_drop</span>
+                    <span class="text-[9px] font-medium font-sans">POI</span>
+                  </button>
+                  <button id="pop-lock-${v.id}" class="flex flex-col items-center justify-center p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                    isLocked 
+                      ? "border-red-200 bg-red-50/50 text-red-600" 
+                      : "border-slate-100 hover:bg-slate-50 text-slate-600"
+                  }">
+                    <span class="material-symbols-outlined text-[16px] mb-0.5" id="pop-lock-icon-${v.id}">${isLocked ? 'lock' : 'lock_open'}</span>
+                    <span class="text-[9px] font-medium font-sans" id="pop-lock-text-${v.id}">${isLocked ? 'Unlock' : 'Lock'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          marker.bindPopup(popupHtml, {
             className: "custom-leaflet-popup",
             maxWidth: 285,
             minWidth: 245,
             offset: [0, -12]
-          })
-          .on("click", () => {
+          }).on("click", () => {
             setSelectedVehicleId(v.id);
           });
-          
+        }
+
         activeMarkers[v.id] = marker;
       });
 
-      // Draw route for selected vehicle
-      if (selectedVehicleId && ROUTE_DETAILS[selectedVehicleId]) {
+      // History Mode specific drawing
+      if (historyVehicleId) {
+        const active = vehicles.find((v) => v.id === historyVehicleId);
+        if (active) {
+          const path = getVehiclePath(historyVehicleId, vehicles);
+          const currentPoint = path[historyPlaybackIndex] || path[0];
+
+          // 1. Draw the complete historical path (Polyline)
+          const historyPolyline = L.polyline(path, {
+            color: "#6366f1",
+            weight: 5,
+            opacity: 0.75,
+            lineCap: "round",
+            lineJoin: "round"
+          }).addTo(map);
+          routePolylinesRef.current.push(historyPolyline);
+
+          // 2. Draw Start Marker
+          const startMarker = L.marker(path[0], {
+            icon: L.divIcon({
+              html: `
+                <div class="relative flex flex-col items-center group">
+                  <div class="absolute bottom-full mb-1 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
+                    Start Point
+                  </div>
+                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-slate-950 shadow-md"></div>
+                </div>
+              `,
+              className: "custom-route-start",
+              iconSize: [14, 14],
+              iconAnchor: [7, 7],
+            })
+          }).addTo(map);
+
+          // 3. Draw End Marker
+          const endMarker = L.marker(path[path.length - 1], {
+            icon: L.divIcon({
+              html: `
+                <div class="relative flex flex-col items-center group">
+                  <div class="absolute bottom-full mb-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
+                    End Point
+                  </div>
+                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-md"></div>
+                </div>
+              `,
+              className: "custom-route-end",
+              iconSize: [14, 14],
+              iconAnchor: [7, 7],
+            })
+          }).addTo(map);
+
+          routeMarkersRef.current.push(startMarker, endMarker);
+
+          // 4. Draw Playback Vehicle Marker
+          const historyIconHtml = `
+            <div class="relative flex flex-col items-center">
+              <div class="absolute bottom-full mb-2 bg-[#4f46e5] text-white px-2 py-0.5 rounded-full shadow-lg border border-primary/20 pointer-events-none whitespace-nowrap">
+                <p class="text-[9px] font-bold">#${active.id.split(" ")[1]} • Playback</p>
+              </div>
+              <div class="w-10 h-10 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-[#4f46e5]/25">
+                <img src="${active.image}" class="w-full h-full object-cover" style="object-fit: cover;" alt="" />
+              </div>
+            </div>
+          `;
+
+          const historyPlaybackMarker = L.marker(currentPoint, {
+            icon: L.divIcon({
+              html: historyIconHtml,
+              className: "group custom-marker-pin",
+              iconSize: [40, 40],
+              iconAnchor: [20, 20],
+            })
+          }).addTo(map);
+
+          activeMarkers[historyVehicleId] = historyPlaybackMarker;
+
+          // Pan to current playback point
+          map.panTo(currentPoint);
+        }
+      }
+      // Normal Route details drawing
+      else if (selectedVehicleId && ROUTE_DETAILS[selectedVehicleId]) {
         const details = ROUTE_DETAILS[selectedVehicleId];
         const active = vehicles.find((v) => v.id === selectedVehicleId);
         if (active) {
@@ -663,7 +806,7 @@ export default function Home() {
                   <div class="absolute bottom-full mb-1 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
                     Origin: ${details.origin}
                   </div>
-                  <div class="w-3 h-3 rounded-full bg-white border-[3.5px] border-slate-950 shadow-md"></div>
+                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-slate-950 shadow-md"></div>
                 </div>
               `,
               className: "custom-route-start",
@@ -680,7 +823,7 @@ export default function Home() {
                   <div class="absolute bottom-full mb-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg pointer-events-none whitespace-nowrap uppercase tracking-wider">
                     Dest: ${details.destination}
                   </div>
-                  <div class="w-3 h-3 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-md"></div>
+                  <div class="w-3.5 h-3.5 rounded-full bg-white border-[3.5px] border-[#4f46e5] shadow-md"></div>
                 </div>
               `,
               className: "custom-route-end",
@@ -696,8 +839,8 @@ export default function Home() {
       // Track markers ref for updates
       markersRef.current = activeMarkers;
 
-      // If a vehicle is selected, open its popup automatically
-      if (selectedVehicleId && activeMarkers[selectedVehicleId]) {
+      // If a vehicle is selected, open its popup automatically (only if NOT in history mode)
+      if (selectedVehicleId && activeMarkers[selectedVehicleId] && !historyVehicleId) {
         setTimeout(() => {
           if (activeMarkers[selectedVehicleId]) {
             activeMarkers[selectedVehicleId].openPopup();
@@ -705,11 +848,11 @@ export default function Home() {
         }, 120);
       }
 
-      // Handle pan / zoom transitions on selected ID change
+      // Handle pan / zoom transitions on selected ID change (only if NOT in history mode)
       const selectionChanged = selectedVehicleId !== prevSelectedIdRef.current;
       prevSelectedIdRef.current = selectedVehicleId;
 
-      if (selectedVehicleId && selectionChanged) {
+      if (selectedVehicleId && selectionChanged && !historyVehicleId) {
         const active = vehicles.find((v) => v.id === selectedVehicleId);
         const details = ROUTE_DETAILS[selectedVehicleId];
         if (active && details) {
@@ -744,7 +887,7 @@ export default function Home() {
       });
       routeMarkersRef.current = [];
     };
-  }, [map, vehicles, selectedVehicleId]);
+  }, [map, vehicles, selectedVehicleId, historyVehicleId, historyPlaybackIndex]);
 
   // Zoom Button interactions
   const handleZoomIn = () => {
@@ -949,11 +1092,140 @@ export default function Home() {
           <div className="absolute inset-0 map-vignette pointer-events-none z-10"></div>
 
           {/* Floating Vehicle Panel */}
-          <div className={`absolute top-6 left-6 bottom-6 z-20 flex flex-col gap-4 transition-all duration-300 ease-in-out ${isListShrunk && !selectedVehicle ? 'w-20' : 'w-80'}`}>
-            <div className={`glass-panel rounded-3xl flex flex-col h-full floating-ui overflow-hidden transition-all duration-300 ease-in-out ${isListShrunk && !selectedVehicle ? 'p-3' : 'p-5'}`}>
+          <div className={`absolute top-6 left-6 bottom-6 z-20 flex flex-col gap-4 transition-all duration-300 ease-in-out ${historyVehicleId ? 'w-80' : (isListShrunk && !selectedVehicle ? 'w-20' : 'w-80')}`}>
+            <div className={`glass-panel rounded-3xl flex flex-col h-full floating-ui overflow-hidden transition-all duration-300 ease-in-out ${historyVehicleId ? 'p-5' : (isListShrunk && !selectedVehicle ? 'p-3' : 'p-5')}`}>
               
-              {/* Conditional Panel Rendering: List vs Detail */}
-              {!selectedVehicle ? (
+              {/* Conditional Panel Rendering: History Playback vs List vs Detail */}
+              {historyVehicleId ? (
+                // History Playback Controls Panel
+                <div className="flex flex-col h-full justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-4 pt-1">
+                      <button
+                        onClick={() => {
+                          setHistoryVehicleId(null);
+                          setIsPlayingHistory(false);
+                          setHistoryPlaybackIndex(0);
+                        }}
+                        className="p-1 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors flex items-center justify-center"
+                        title="Exit History Mode"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                      </button>
+                      <div>
+                        <h2 className="text-[14px] font-bold text-slate-800 dark:text-slate-100 tracking-tight">Route History</h2>
+                        <p className="text-[10px] text-slate-400 font-medium font-mono">{historyVehicleId}</p>
+                      </div>
+                    </div>
+
+                    {/* Date/Time Filter */}
+                    <div className="bg-white/50 dark:bg-slate-900/50 border border-slate-200/40 dark:border-slate-800 rounded-2xl p-3.5 space-y-3 mb-4">
+                      <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Timeframe Filter</p>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        <div>
+                          <label className="text-[8px] font-bold text-slate-450 dark:text-slate-500 uppercase block mb-1">Start Date/Time</label>
+                          <input
+                            type="datetime-local"
+                            value={historyStartDate}
+                            onChange={(e) => {
+                              setHistoryStartDate(e.target.value);
+                              setHistoryPlaybackIndex(0);
+                            }}
+                            className="w-full bg-white/60 dark:bg-slate-900/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-2.5 py-1 text-[10px] text-slate-600 dark:text-slate-200 focus:outline-none focus:border-primary/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[8px] font-bold text-slate-450 dark:text-slate-500 uppercase block mb-1">End Date/Time</label>
+                          <input
+                            type="datetime-local"
+                            value={historyEndDate}
+                            onChange={(e) => {
+                              setHistoryEndDate(e.target.value);
+                              setHistoryPlaybackIndex(0);
+                            }}
+                            className="w-full bg-white/60 dark:bg-slate-900/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-2.5 py-1 text-[10px] text-slate-600 dark:text-slate-200 focus:outline-none focus:border-primary/50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Route Details info */}
+                    <div className="bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl p-3.5 space-y-2 border border-slate-100/50 dark:border-slate-800/30">
+                      <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Trip Details</p>
+                      <div className="flex flex-col gap-1.5 text-[10px]">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Driver:</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            {vehicles.find(v => v.id === historyVehicleId)?.driverName || "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Origin:</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
+                            {ROUTE_DETAILS[historyVehicleId]?.origin || "Starting Terminal"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Destination:</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
+                            {ROUTE_DETAILS[historyVehicleId]?.destination || "Destination Terminal"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Playback Controls Footer */}
+                  <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    {/* Playback Progress */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[9px] font-mono text-slate-400">
+                        <span>Playback Progress</span>
+                        <span>
+                          {Math.round((historyPlaybackIndex / (getVehiclePath(historyVehicleId, vehicles).length - 1)) * 100) || 0}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-350"
+                          style={{
+                            width: `${(historyPlaybackIndex / (getVehiclePath(historyVehicleId, vehicles).length - 1)) * 100}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const path = getVehiclePath(historyVehicleId, vehicles);
+                          if (historyPlaybackIndex >= path.length - 1) {
+                            setHistoryPlaybackIndex(0);
+                          }
+                          setIsPlayingHistory(!isPlayingHistory);
+                        }}
+                        className="flex-1 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-md shadow-primary/10 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          {isPlayingHistory ? "pause" : "play_arrow"}
+                        </span>
+                        {isPlayingHistory ? "Pause" : "Play Route"}
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          alert(`Historical route path for ${historyVehicleId} saved successfully.`);
+                        }}
+                        className="px-3.5 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors"
+                        title="Save Path"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">save</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : !selectedVehicle ? (
                 isListShrunk ? (
                   <div className="flex flex-col items-center gap-3 h-full overflow-hidden w-full">
                     {/* Expand Trigger Button */}
@@ -1167,9 +1439,64 @@ export default function Home() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex justify-between items-start">
                                     <p className="font-bold text-[12px] text-slate-800 truncate">{vehicle.id} | {vehicle.name}</p>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <span className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer">expand_more</span>
-                                      <span className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer">more_vert</span>
+                                    <div className="flex items-center gap-1 shrink-0 relative">
+                                      <span
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedVehicleId(vehicle.id);
+                                        }}
+                                        className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer"
+                                        title="Focus vehicle route"
+                                      >
+                                        expand_more
+                                      </span>
+                                      <span
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveMenuVehicleId(activeMenuVehicleId === vehicle.id ? null : vehicle.id);
+                                        }}
+                                        className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer"
+                                        title="Actions"
+                                      >
+                                        more_vert
+                                      </span>
+                                      
+                                      {activeMenuVehicleId === vehicle.id && (
+                                        <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveMenuVehicleId(null);
+                                              alert(`Viewing Profile: Driver - ${vehicle.driverName}, Role - ${vehicle.driverRole}, Vehicle ID - ${vehicle.id}`);
+                                            }}
+                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                          >
+                                            View Profile
+                                          </button>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveMenuVehicleId(null);
+                                              setHistoryVehicleId(vehicle.id);
+                                              setHistoryPlaybackIndex(0);
+                                              setIsPlayingHistory(false);
+                                            }}
+                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                          >
+                                            History
+                                          </button>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveMenuVehicleId(null);
+                                              alert(`Operational Report generated for vehicle ${vehicle.id}`);
+                                            }}
+                                            className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                          >
+                                            Report
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   
@@ -1281,9 +1608,55 @@ export default function Home() {
                         <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                         <span className="text-[10px] font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">Fleet</span>
                       </button>
-                      <button className="p-1.5 text-slate-400 hover:text-on-surface hover:bg-slate-100 transition-colors rounded-lg">
-                        <span className="material-symbols-outlined text-[20px]">more_vert</span>
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsDetailMenuOpen(!isDetailMenuOpen);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-on-surface hover:bg-slate-100 transition-colors rounded-lg flex items-center justify-center"
+                          title="Actions"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                        </button>
+                        
+                        {isDetailMenuOpen && (
+                          <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsDetailMenuOpen(false);
+                                alert(`Viewing Profile: Driver - ${selectedVehicle.driverName}, Role - ${selectedVehicle.driverRole}, Vehicle ID - ${selectedVehicle.id}`);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                              View Profile
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsDetailMenuOpen(false);
+                                setHistoryVehicleId(selectedVehicle.id);
+                                setHistoryPlaybackIndex(0);
+                                setIsPlayingHistory(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                              History
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsDetailMenuOpen(false);
+                                alert(`Operational Report generated for vehicle ${selectedVehicle.id}`);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            >
+                              Report
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Scrollable details view content */}
