@@ -310,7 +310,11 @@ export default function Home() {
 
   // Click outside to close dropdowns
   useEffect(() => {
-    const handleDocumentClick = () => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".more-actions-trigger") || target.closest(".more-actions-dropdown")) {
+        return;
+      }
       setActiveMenuVehicleId(null);
       setIsDetailMenuOpen(false);
     };
@@ -1455,14 +1459,14 @@ export default function Home() {
                                           e.stopPropagation();
                                           setActiveMenuVehicleId(activeMenuVehicleId === vehicle.id ? null : vehicle.id);
                                         }}
-                                        className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer"
+                                        className="material-symbols-outlined text-slate-400 text-[18px] hover:text-primary cursor-pointer more-actions-trigger"
                                         title="Actions"
                                       >
                                         more_vert
                                       </span>
                                       
                                       {activeMenuVehicleId === vehicle.id && (
-                                        <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui">
+                                        <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui more-actions-dropdown">
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
@@ -1614,14 +1618,14 @@ export default function Home() {
                             e.stopPropagation();
                             setIsDetailMenuOpen(!isDetailMenuOpen);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-on-surface hover:bg-slate-100 transition-colors rounded-lg flex items-center justify-center"
+                          className="p-1.5 text-slate-400 hover:text-on-surface hover:bg-slate-100 transition-colors rounded-lg flex items-center justify-center more-actions-trigger"
                           title="Actions"
                         >
                           <span className="material-symbols-outlined text-[20px]">more_vert</span>
                         </button>
                         
                         {isDetailMenuOpen && (
-                          <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui">
+                          <div className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl shadow-xl py-1 z-50 floating-ui more-actions-dropdown">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
