@@ -1171,12 +1171,18 @@ export default function Home() {
                                         <span className="text-[10px] truncate">{vehicle.location}</span>
                                       </div>
                                     )}
-                                    {displayFields.odometer && (
-                                      <div className="flex items-center gap-1 text-slate-500">
-                                        <span className="material-symbols-outlined text-[12px] shrink-0">speed</span>
-                                        <span className="text-[10px]">{vehicle.odometer}</span>
+                                    <div className="flex items-center gap-3 text-slate-500">
+                                      {displayFields.odometer && (
+                                        <div className="flex items-center gap-1">
+                                          <span className="material-symbols-outlined text-[12px] shrink-0">speed</span>
+                                          <span className="text-[10px]">{vehicle.odometer}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[12px] shrink-0">person</span>
+                                        <span className="text-[10px] truncate">{vehicle.driverName}</span>
                                       </div>
-                                    )}
+                                    </div>
                                     {displayFields.temperature && (
                                       <div className="flex items-center gap-1 text-slate-500">
                                         <span className="material-symbols-outlined text-[12px] shrink-0">thermostat</span>
