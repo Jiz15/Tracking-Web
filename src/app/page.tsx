@@ -1978,10 +1978,11 @@ export default function Home() {
                           </div>
                         </div>
                         <button
-                          onClick={() => alert(`Showing log history for driver ${selectedVehicle.driverName}`)}
-                          className="text-[10px] font-bold text-primary hover:underline"
+                          onClick={() => setProfileModalVehicleId(selectedVehicle.id)}
+                          className="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-slate-150 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="View Driver Profile"
                         >
-                          View Driver
+                          <span className="material-symbols-outlined text-[15px]">visibility</span>
                         </button>
                       </div>
                       <button
