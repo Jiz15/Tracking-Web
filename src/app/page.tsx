@@ -1797,7 +1797,7 @@ export default function Home() {
                       {/* Operational Alerts */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-orange-50 rounded-2xl p-3 border border-orange-100">
-                          <p className="text-[9px] font-bold text-orange-600 uppercase mb-1">Excessive Idle</p>
+                          <p className="text-[9px] font-bold text-orange-600 uppercase mb-1">Ex.idle</p>
                           <div className="flex items-baseline gap-1">
                             <span className="text-lg font-bold text-orange-700">{selectedVehicle.alerts.idle}</span>
                             <span className="text-[10px] text-orange-500 font-medium">Alerts</span>
