@@ -1744,7 +1744,7 @@ export default function Home() {
                       </div>
 
                       {/* Main Action Buttons */}
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-2.5 justify-start py-1">
                         <button
                           onClick={() => {
                             setLockedVehicles((prev) => {
@@ -1758,28 +1758,30 @@ export default function Home() {
                               }
                             });
                           }}
-                          className={`flex-1 py-1.5 border rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all duration-200 ${
+                          className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 shrink-0 cursor-pointer ${
                             lockedVehicles.includes(selectedVehicle.id)
                               ? "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100/50"
-                              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                              : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                           }`}
+                          title={lockedVehicles.includes(selectedVehicle.id) ? "Unlock Vehicle" : "Lock Vehicle"}
                         >
-                          <span className="material-symbols-outlined text-[16px]">
+                          <span className="material-symbols-outlined text-[15px]">
                             {lockedVehicles.includes(selectedVehicle.id) ? "lock" : "lock_open"}
-                          </span>{" "}
-                          {lockedVehicles.includes(selectedVehicle.id) ? "Unlock" : "Lock"}
+                          </span>
                         </button>
                         <button
                           onClick={() => alert(`Generated coordinate share link for ${selectedVehicle.id}`)}
-                          className="flex-1 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 flex items-center justify-center gap-1 hover:bg-slate-100 transition-colors"
+                          className="w-9 h-9 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                          title="Share Location"
                         >
-                          <span className="material-symbols-outlined text-[16px]">share</span> Share
+                          <span className="material-symbols-outlined text-[15px]">share</span>
                         </button>
                         <button
                           onClick={() => alert(`Report downloaded for ${selectedVehicle.id}`)}
-                          className="flex-1 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 flex items-center justify-center gap-1 hover:bg-slate-100 transition-colors"
+                          className="w-9 h-9 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                          title="Diagnostics Report"
                         >
-                          <span className="material-symbols-outlined text-[16px]">description</span> Report
+                          <span className="material-symbols-outlined text-[15px]">description</span>
                         </button>
                       </div>
 
